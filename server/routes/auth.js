@@ -7,7 +7,6 @@ const db = require('../db')
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret'
 const JWT_EXPIRES = '7d'
 
-// In-memory rate limiter (unchanged)
 const loginAttempts = new Map()
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000
 const MAX_ATTEMPTS = 10
@@ -31,7 +30,7 @@ function isValidEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) }
 
 function signToken(user) {
   return jwt.sign(
-    { id: user.id, name: user.name, email: user.email },
+    { id: user.id, first_name: user.first_name, last_name: user.last_name, email: user.email },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES }
   )
@@ -39,10 +38,12 @@ function signToken(user) {
 
 // POST /auth/register
 router.post('/register', async (req, res) => {
-  const { name, email, password } = req.body
+  const { first_name, last_name, email, password } = req.body
   const errors = []
-  if (!name || typeof name !== 'string' || name.trim().length === 0) errors.push('Name is required')
-  if (name && name.trim().length > 100) errors.push('Name must be under 100 characters')
+  if (!first_name || typeof first_name !== 'string' || first_name.trim().length === 0) errors.push('First name is required')
+  if (first_name && first_name.trim().length > 100) errors.push('First name must be under 100 characters')
+  if (!last_name || typeof last_name !== 'string' || last_name.trim().length === 0) errors.push('Last name is required')
+  if (last_name && last_name.trim().length > 100) errors.push('Last name must be under 100 characters')
   if (!email || !isValidEmail(email)) errors.push('A valid email is required')
   if (!password) errors.push('Password is required')
   if (password && password.length < 8) errors.push('Password must be at least 8 characters')
@@ -58,12 +59,14 @@ router.post('/register', async (req, res) => {
     if (existing) return res.status(409).json({ error: 'Email already in use' })
 
     const hashed = await bcrypt.hash(password, 10)
-    const result = await db.runAsync('INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
-      [name.trim(), email.toLowerCase().trim(), hashed])
+    const result = await db.runAsync(
+      'INSERT INTO users (first_name, last_name, email, password) VALUES (?, ?, ?, ?)',
+      [first_name.trim(), last_name.trim(), email.toLowerCase().trim(), hashed]
+    )
 
-    const user = { id: result.lastID, name: name.trim(), email: email.toLowerCase().trim() }
+    const user = { id: result.lastID, first_name: first_name.trim(), last_name: last_name.trim(), email: email.toLowerCase().trim() }
     const token = signToken(user)
-    res.status(201).json({ message: 'Account created', token, user: { id: user.id, name: user.name } })
+    res.status(201).json({ message: 'Account created', token, user: { id: user.id, first_name: user.first_name, last_name: user.last_name } })
   } catch (err) {
     res.status(500).json({ error: 'Failed to register' })
   }
@@ -87,13 +90,13 @@ router.post('/login', async (req, res) => {
 
     clearAttempts(`login:${ip}`)
     const token = signToken(user)
-    res.json({ message: 'Logged in', token, user: { id: user.id, name: user.name } })
+    res.json({ message: 'Logged in', token, user: { id: user.id, first_name: user.first_name, last_name: user.last_name } })
   } catch (err) {
     res.status(500).json({ error: 'Failed to login' })
   }
 })
 
-// POST /auth/logout — client just discards the token
+// POST /auth/logout
 router.post('/logout', (req, res) => {
   res.json({ message: 'Logged out' })
 })
@@ -104,7 +107,7 @@ router.get('/me', (req, res) => {
   if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' })
   try {
     const user = jwt.verify(authHeader.slice(7), JWT_SECRET)
-    res.json({ user: { id: user.id, name: user.name, email: user.email } })
+    res.json({ user: { id: user.id, first_name: user.first_name, last_name: user.last_name, email: user.email } })
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' })
   }
@@ -122,7 +125,6 @@ router.put('/password', async (req, res) => {
   const { currentPassword, newPassword } = req.body
   if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Both passwords required' })
   if (newPassword.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters' })
-  if (newPassword.length > 128) return res.status(400).json({ error: 'New password must be under 128 characters' })
 
   try {
     const user = await db.getAsync('SELECT * FROM users WHERE id = ?', [currentUser.id])

@@ -5,6 +5,7 @@ const cors = require('cors')
 const apartmentRoutes = require('./routes/apartments')
 const authRoutes = require('./routes/auth')
 const userRoutes = require('./routes/users')
+const verificationRoutes = require('./routes/verifications')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -17,6 +18,7 @@ app.use(express.json({ limit: '10kb' }))
 app.use('/apartments', apartmentRoutes)
 app.use('/auth', authRoutes)
 app.use('/users', userRoutes)
+app.use('/verifications', verificationRoutes)
 
 app.get('/', (req, res) => res.json({
   name: 'RentWise API',

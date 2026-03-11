@@ -4,8 +4,91 @@ import { api } from '../api'
 import { useAuth } from '../context/AuthContext'
 import StarRating from '../components/StarRating'
 
-function ReviewForm({ apartmentId, onSubmit }) {
-  const [form, setForm] = useState({ rating: 5, title: '', body: '', noise: '', safety: '', maintenance: '', landlord: '' })
+const DOC_TYPE_OPTIONS = [
+  { value: 'lease', label: 'Lease Agreement' },
+  { value: 'utility_bill', label: 'Utility Bill' },
+  { value: 'postal_mail', label: 'Postal Mail' },
+]
+
+function VerificationStep({ apartment, onVerified }) {
+  const [docType, setDocType] = useState('lease')
+  const [file, setFile] = useState(null)
+  const [status, setStatus] = useState('idle') // idle | loading | failed | error
+  const [errorMsg, setErrorMsg] = useState('')
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!file) return setErrorMsg('Please select a document image.')
+    setStatus('loading')
+    setErrorMsg('')
+
+    const formData = new FormData()
+    formData.append('apartment_id', apartment.id)
+    formData.append('doc_type', docType)
+    formData.append('document', file)
+
+    try {
+      const result = await api.createVerification(formData)
+      if (result.verification_status === 'verified') {
+        onVerified(result.id)
+      } else {
+        setStatus('failed')
+      }
+    } catch (err) {
+      setStatus('error')
+      setErrorMsg(err.message)
+    }
+  }
+
+  return (
+    <div className="review-form">
+      <h3>Verify Your Residency</h3>
+      <p className="text-muted">
+        Upload a document showing your address at <strong>{apartment.street_address}, {apartment.city}</strong> to post a review.
+      </p>
+
+      {status === 'failed' && (
+        <div className="error-msg">
+          Address on document didn't match the apartment address. Please try a different document.
+        </div>
+      )}
+      {status === 'error' && <div className="error-msg">{errorMsg}</div>}
+
+      <form onSubmit={handleSubmit}>
+        <div className="form-row">
+          <label>Document Type
+            <select value={docType} onChange={e => setDocType(e.target.value)} className="input">
+              {DOC_TYPE_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="form-row">
+          <label>Upload Document
+            <input
+              type="file"
+              accept="image/*"
+              className="input"
+              onChange={e => setFile(e.target.files[0] || null)}
+              required
+            />
+          </label>
+        </div>
+
+        <button type="submit" className="btn" disabled={status === 'loading'}>
+          {status === 'loading' ? 'Verifying...' : 'Verify Residency'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function ReviewForm({ apartmentId, verificationId, onSubmit }) {
+  const [form, setForm] = useState({
+    rating_overall: 5, rating_safety: '', rating_management: '', title: '', review_text: ''
+  })
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -14,17 +97,15 @@ function ReviewForm({ apartmentId, onSubmit }) {
     setError('')
     setSubmitting(true)
     try {
-      const data = {
-        rating: Number(form.rating),
+      await api.createReview(apartmentId, {
+        verification_id: verificationId,
+        rating_overall: Number(form.rating_overall),
+        rating_safety: form.rating_safety !== '' ? Number(form.rating_safety) : undefined,
+        rating_management: form.rating_management !== '' ? Number(form.rating_management) : undefined,
         title: form.title,
-        body: form.body,
-        ...(form.noise && { noise: Number(form.noise) }),
-        ...(form.safety && { safety: Number(form.safety) }),
-        ...(form.maintenance && { maintenance: Number(form.maintenance) }),
-        ...(form.landlord && { landlord: Number(form.landlord) }),
-      }
-      await api.createReview(apartmentId, data)
-      setForm({ rating: 5, title: '', body: '', noise: '', safety: '', maintenance: '', landlord: '' })
+        review_text: form.review_text,
+      })
+      setForm({ rating_overall: 5, rating_safety: '', rating_management: '', title: '', review_text: '' })
       onSubmit()
     } catch (err) {
       setError(err.message)
@@ -36,11 +117,12 @@ function ReviewForm({ apartmentId, onSubmit }) {
   return (
     <form onSubmit={handleSubmit} className="review-form">
       <h3>Write a Review</h3>
+      <div className="verified-badge">✓ Verified Tenant</div>
       {error && <div className="error-msg">{error}</div>}
 
       <div className="form-row">
         <label>Overall Rating
-          <select value={form.rating} onChange={e => setForm({ ...form, rating: e.target.value })} className="input">
+          <select value={form.rating_overall} onChange={e => setForm({ ...form, rating_overall: e.target.value })} className="input">
             {[5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1].map(n => (
               <option key={n} value={n}>{n} ★</option>
             ))}
@@ -57,21 +139,24 @@ function ReviewForm({ apartmentId, onSubmit }) {
 
       <div className="form-row">
         <label>Review
-          <textarea value={form.body} onChange={e => setForm({ ...form, body: e.target.value })}
+          <textarea value={form.review_text} onChange={e => setForm({ ...form, review_text: e.target.value })}
             className="input" rows={4} placeholder="What was it like living here?" required />
         </label>
       </div>
 
       <div className="sub-ratings">
-        {['noise', 'safety', 'maintenance', 'landlord'].map(field => (
-          <label key={field}>
-            {field.charAt(0).toUpperCase() + field.slice(1)}
-            <select value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })} className="input">
-              <option value="">—</option>
-              {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
-        ))}
+        <label>Safety
+          <select value={form.rating_safety} onChange={e => setForm({ ...form, rating_safety: e.target.value })} className="input">
+            <option value="">—</option>
+            {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <label>Management
+          <select value={form.rating_management} onChange={e => setForm({ ...form, rating_management: e.target.value })} className="input">
+            <option value="">—</option>
+            {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
       </div>
 
       <button type="submit" className="btn" disabled={submitting}>
@@ -97,18 +182,17 @@ function ReviewCard({ review, apartmentId, currentUserId, onDelete }) {
   return (
     <div className="review-card">
       <div className="review-header">
-        <StarRating rating={review.rating} size="sm" />
-        <span className="review-author">by {review.user_name}</span>
+        <StarRating rating={review.rating_overall} size="sm" />
+        <span className="review-author">by {review.first_name} {review.last_name}</span>
+        <span className="verified-badge small">✓ Verified</span>
         <span className="review-date">{new Date(review.created_at).toLocaleDateString()}</span>
       </div>
       <h4>{review.title}</h4>
-      <p>{review.body}</p>
-      {(review.noise || review.safety || review.maintenance || review.landlord) && (
+      <p>{review.review_text}</p>
+      {(review.rating_safety || review.rating_management) && (
         <div className="sub-ratings-display">
-          {review.noise && <span>Noise: {review.noise}/5</span>}
-          {review.safety && <span>Safety: {review.safety}/5</span>}
-          {review.maintenance && <span>Maintenance: {review.maintenance}/5</span>}
-          {review.landlord && <span>Landlord: {review.landlord}/5</span>}
+          {review.rating_safety && <span>Safety: {review.rating_safety}/5</span>}
+          {review.rating_management && <span>Management: {review.rating_management}/5</span>}
         </div>
       )}
       {isOwner && (
@@ -124,6 +208,8 @@ export default function ApartmentDetail() {
   const [apartment, setApartment] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [verificationId, setVerificationId] = useState(null)
+  const [checkingVerification, setCheckingVerification] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -135,11 +221,20 @@ export default function ApartmentDetail() {
 
   useEffect(() => { load() }, [id])
 
+  useEffect(() => {
+    if (!user || !id) return
+    setCheckingVerification(true)
+    api.getMyVerification(id)
+      .then(data => setVerificationId(data.verification?.id || null))
+      .catch(() => setVerificationId(null))
+      .finally(() => setCheckingVerification(false))
+  }, [user, id])
+
   if (loading) return <div className="page"><div className="loading">Loading...</div></div>
   if (error) return <div className="page"><div className="error-msg">{error}</div></div>
   if (!apartment) return <div className="page"><div className="empty">Apartment not found</div></div>
 
-  const hasReviewed = user && apartment.reviews?.some(r => r.user_id === user.id)
+  const hasReviewed = verificationId && apartment.reviews?.some(r => r.verification_id === verificationId)
 
   return (
     <div className="page">
@@ -149,16 +244,11 @@ export default function ApartmentDetail() {
         <div className="detail-header">
           <div>
             <h1>{apartment.name}</h1>
-            <p className="detail-address">{apartment.address}</p>
+            <p className="detail-address">{apartment.street_address}, {apartment.city}, {apartment.state} {apartment.zip_code}</p>
             <div className="detail-meta">
-              <span className="badge">{apartment.neighborhood}</span>
-              {apartment.beds && <span>{apartment.beds} bed{apartment.beds !== 1 ? 's' : ''}</span>}
-              {apartment.baths && <span>{apartment.baths} bath{apartment.baths !== 1 ? 's' : ''}</span>}
+              {apartment.property_type && <span className="badge">{apartment.property_type}</span>}
+              {apartment.year_built && <span>Built {apartment.year_built}</span>}
             </div>
-          </div>
-          <div className="detail-price">
-            <span className="price-big">${apartment.price.toLocaleString()}</span>
-            <span className="price-label">/month</span>
           </div>
         </div>
 
@@ -171,12 +261,16 @@ export default function ApartmentDetail() {
       <div className="reviews-section">
         <h2>Reviews</h2>
 
-        {user && !hasReviewed && (
-          <ReviewForm apartmentId={apartment.id} onSubmit={load} />
-        )}
-
         {!user && (
           <p className="text-muted"><Link to="/login">Log in</Link> to write a review.</p>
+        )}
+
+        {user && !checkingVerification && !verificationId && (
+          <VerificationStep apartment={apartment} onVerified={setVerificationId} />
+        )}
+
+        {user && verificationId && !hasReviewed && (
+          <ReviewForm apartmentId={apartment.id} verificationId={verificationId} onSubmit={load} />
         )}
 
         {hasReviewed && (

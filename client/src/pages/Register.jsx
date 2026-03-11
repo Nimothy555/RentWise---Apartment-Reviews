@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Register() {
-  const [name, setName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -16,7 +17,7 @@ export default function Register() {
     setError('')
     setLoading(true)
     try {
-      await register(name, email, password)
+      await register(firstName, lastName, email, password)
       navigate('/')
     } catch (err) {
       setError(err.message)
@@ -35,9 +36,14 @@ export default function Register() {
 
         <form onSubmit={handleSubmit} className="auth-form">
           <label>
-            Name
-            <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="input" placeholder="Your name" required />
+            First Name
+            <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)}
+              className="input" placeholder="First name" required />
+          </label>
+          <label>
+            Last Name
+            <input type="text" value={lastName} onChange={e => setLastName(e.target.value)}
+              className="input" placeholder="Last name" required />
           </label>
           <label>
             Email

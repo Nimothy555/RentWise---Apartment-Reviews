@@ -7,11 +7,8 @@ export default function Home() {
   const [pagination, setPagination] = useState(null)
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
-    search: '', neighborhood: '', minPrice: '', maxPrice: '',
-    minRating: '', beds: '', sort: 'newest', page: 1
+    search: '', minRating: '', sort: 'newest', page: 1
   })
-
-  const neighborhoods = ['Downtown', 'Midtown', 'Waterfront', 'Suburbs']
 
   useEffect(() => {
     setLoading(true)
@@ -35,8 +32,7 @@ export default function Home() {
   return (
     <div className="page">
       <div className="hero">
-        <h1>Find your next apartment</h1>
-        <p>Real reviews from real renters</p>
+        <h1>Real reviews from real renters</h1>
       </div>
 
       <div className="filters">
@@ -47,21 +43,8 @@ export default function Home() {
           onChange={e => updateFilter('search', e.target.value)}
           className="input search-input"
         />
-        <select value={filters.neighborhood} onChange={e => updateFilter('neighborhood', e.target.value)} className="input">
-          <option value="">All Neighborhoods</option>
-          {neighborhoods.map(n => <option key={n} value={n}>{n}</option>)}
-        </select>
-        <input type="number" placeholder="Min $" value={filters.minPrice}
-          onChange={e => updateFilter('minPrice', e.target.value)} className="input input-sm" />
-        <input type="number" placeholder="Max $" value={filters.maxPrice}
-          onChange={e => updateFilter('maxPrice', e.target.value)} className="input input-sm" />
-        <select value={filters.beds} onChange={e => updateFilter('beds', e.target.value)} className="input">
-          <option value="">Any Beds</option>
-          {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}+</option>)}
-        </select>
         <select value={filters.sort} onChange={e => updateFilter('sort', e.target.value)} className="input">
           <option value="newest">Newest</option>
-          <option value="price">Price</option>
           <option value="rating">Rating</option>
           <option value="reviews">Most Reviews</option>
         </select>

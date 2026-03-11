@@ -1,0 +1,158 @@
+const express = require('express')
+const router = express.Router()
+const multer = require('multer')
+const Anthropic = require('@anthropic-ai/sdk')
+const db = require('../db')
+const { requireAuth } = require('../middleware/auth')
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed'))
+    }
+    cb(null, true)
+  }
+})
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+const DOC_TYPE_LABELS = {
+  lease: 'lease agreement',
+  utility_bill: 'utility bill',
+  postal_mail: 'piece of postal mail'
+}
+
+function normalizeAddress(str) {
+  return str.toLowerCase().replace(/[.,#\-]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function addressesMatch(extracted, apartment) {
+  const extNorm = normalizeAddress(extracted)
+  const streetNorm = normalizeAddress(apartment.street_address)
+  const cityNorm = normalizeAddress(apartment.city)
+  const fullNorm = normalizeAddress(
+    `${apartment.street_address} ${apartment.city} ${apartment.state} ${apartment.zip_code}`
+  )
+  return (
+    extNorm.includes(streetNorm) ||
+    fullNorm.includes(extNorm) ||
+    (extNorm.includes(streetNorm) && extNorm.includes(cityNorm))
+  )
+}
+
+// POST /verifications
+router.post('/', requireAuth, upload.single('document'), async (req, res) => {
+  const { apartment_id, doc_type } = req.body
+
+  if (!apartment_id) return res.status(400).json({ error: 'apartment_id is required' })
+  if (!doc_type || !DOC_TYPE_LABELS[doc_type]) {
+    return res.status(400).json({ error: 'doc_type must be lease, utility_bill, or postal_mail' })
+  }
+  if (!req.file) return res.status(400).json({ error: 'A document image is required' })
+
+  const aptId = parseInt(apartment_id)
+  if (isNaN(aptId)) return res.status(400).json({ error: 'Invalid apartment_id' })
+
+  try {
+    const apartment = await db.getAsync(
+      'SELECT id, name, street_address, city, state, zip_code FROM apartments WHERE id = ?',
+      [aptId]
+    )
+    if (!apartment) return res.status(404).json({ error: 'Apartment not found' })
+
+    // Check if user already has a verified verification for this apartment
+    const existing = await db.getAsync(
+      `SELECT id, verification_status FROM verifications
+       WHERE user_id = ? AND apartment_id = ? AND verification_status = 'verified'`,
+      [req.user.id, aptId]
+    )
+    if (existing) {
+      return res.status(409).json({
+        error: 'You already have a verified record for this apartment',
+        verification_id: existing.id
+      })
+    }
+
+    // Call Claude to extract address from the document
+    const base64Image = req.file.buffer.toString('base64')
+    const mediaType = req.file.mimetype
+
+    let extractedAddress = null
+    let verificationStatus = 'failed'
+
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 256,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: mediaType, data: base64Image }
+            },
+            {
+              type: 'text',
+              text: `This is a ${DOC_TYPE_LABELS[doc_type]}. Extract the property or mailing address from this document. Return ONLY the address in the format: "street, city, state zip". If no clear address is found, return exactly: NOT_FOUND`
+            }
+          ]
+        }]
+      })
+
+      extractedAddress = response.content[0]?.text?.trim()
+
+      if (extractedAddress && extractedAddress !== 'NOT_FOUND') {
+        verificationStatus = addressesMatch(extractedAddress, apartment) ? 'verified' : 'failed'
+      }
+    } catch (claudeErr) {
+      console.error('Claude API error:', claudeErr.message)
+      // Store as failed if Claude is unavailable
+    }
+
+    // Store document as base64 data URL
+    const documentUrl = `data:${mediaType};base64,${base64Image}`
+
+    const result = await db.runAsync(
+      `INSERT INTO verifications (user_id, apartment_id, doc_type, document_url, verification_status)
+       VALUES (?, ?, ?, ?, ?)`,
+      [req.user.id, aptId, doc_type, documentUrl, verificationStatus]
+    )
+
+    // If verified, mark user as verified
+    if (verificationStatus === 'verified') {
+      await db.runAsync('UPDATE users SET is_verified = 1 WHERE id = ?', [req.user.id])
+    }
+
+    res.status(201).json({
+      id: result.lastID,
+      verification_status: verificationStatus,
+      extracted_address: extractedAddress,
+      apartment_address: `${apartment.street_address}, ${apartment.city}, ${apartment.state} ${apartment.zip_code}`
+    })
+  } catch (err) {
+    console.error('POST /verifications error:', err)
+    res.status(500).json({ error: 'Failed to process verification' })
+  }
+})
+
+// GET /verifications/my/:apartmentId — check if current user has verified for an apartment
+router.get('/my/:apartmentId', requireAuth, async (req, res) => {
+  const aptId = parseInt(req.params.apartmentId)
+  if (isNaN(aptId)) return res.status(400).json({ error: 'Invalid apartment ID' })
+
+  try {
+    const verification = await db.getAsync(
+      `SELECT id, verification_status FROM verifications
+       WHERE user_id = ? AND apartment_id = ? AND verification_status = 'verified'
+       ORDER BY created_at DESC LIMIT 1`,
+      [req.user.id, aptId]
+    )
+    res.json({ verification: verification || null })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch verification' })
+  }
+})
+
+module.exports = router
