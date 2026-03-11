@@ -14,7 +14,7 @@ export default function Navbar() {
     <nav className="navbar">
       <div className="nav-content">
       <Link to="/" className="nav-logo">
-  <img src="/RentWiseLogo3.png" alt="RentWise" height="62" />
+  <img src="/RentWise Logo - Parth.png" alt="RentWise" height="62" />
       </Link>
         <div className="nav-links">
           <Link to="/">Browse</Link>

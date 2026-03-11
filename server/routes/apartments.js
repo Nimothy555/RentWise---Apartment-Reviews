@@ -1,11 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const db = require('../db')
-
-function requireAuth(req, res, next) {
-  if (!req.session.user) return res.status(401).json({ error: 'Login required' })
-  next()
-}
+const { requireAuth } = require('../middleware/auth')
 
 // Clamp a number between min and max
 function clamp(val, min, max) {
@@ -229,14 +225,14 @@ router.post('/:id/reviews', requireAuth, async (req, res) => {
     // Prevent duplicate reviews from same user on same apartment
     const existing = await db.getAsync(
       'SELECT id FROM reviews WHERE apartment_id = ? AND user_id = ?',
-      [aptId, req.session.user.id]
+      [aptId, req.user.id]
     )
     if (existing) return res.status(409).json({ error: 'You already reviewed this apartment' })
 
     const result = await db.runAsync(`
       INSERT INTO reviews (rating, title, body, noise, safety, maintenance, landlord, apartment_id, user_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [ratingVal, title.trim(), body.trim(), noiseVal, safetyVal, maintenanceVal, landlordVal, aptId, req.session.user.id])
+    `, [ratingVal, title.trim(), body.trim(), noiseVal, safetyVal, maintenanceVal, landlordVal, aptId, req.user.id])
 
     res.status(201).json({ id: result.lastID, message: 'Review created' })
   } catch (err) {
@@ -254,7 +250,7 @@ router.put('/:id/reviews/:reviewId', requireAuth, async (req, res) => {
 
     const review = await db.getAsync('SELECT * FROM reviews WHERE id = ?', [reviewId])
     if (!review) return res.status(404).json({ error: 'Review not found' })
-    if (review.user_id !== req.session.user.id)
+    if (review.user_id !== req.user.id)
       return res.status(403).json({ error: 'Can only edit your own reviews' })
 
     const ratingVal = rating != null ? clamp(rating, 1, 5) : review.rating
@@ -288,7 +284,7 @@ router.delete('/:id/reviews/:reviewId', requireAuth, async (req, res) => {
 
     const review = await db.getAsync('SELECT * FROM reviews WHERE id = ?', [reviewId])
     if (!review) return res.status(404).json({ error: 'Review not found' })
-    if (review.user_id !== req.session.user.id)
+    if (review.user_id !== req.user.id)
       return res.status(403).json({ error: 'Can only delete your own reviews' })
 
     await db.runAsync('DELETE FROM reviews WHERE id = ?', [reviewId])
