@@ -155,4 +155,21 @@ router.get('/my/:apartmentId', requireAuth, async (req, res) => {
   }
 })
 
+// GET /verifications/mine — all verifications for the current user
+router.get('/mine', requireAuth, async (req, res) => {
+  try {
+    const verifications = await db.allAsync(`
+      SELECT v.id, v.apartment_id, v.doc_type, v.verification_status, v.created_at,
+             a.name as apartment_name, a.city, a.state
+      FROM verifications v
+      JOIN apartments a ON a.id = v.apartment_id
+      WHERE v.user_id = ?
+      ORDER BY v.created_at DESC
+    `, [req.user.id])
+    res.json({ verifications })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch verifications' })
+  }
+})
+
 module.exports = router

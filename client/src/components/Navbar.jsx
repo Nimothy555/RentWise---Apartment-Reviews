@@ -14,13 +14,16 @@ export default function Navbar() {
     <nav className="navbar">
       <div className="nav-content">
       <Link to="/" className="nav-logo">
-  <img src="/RentWise Logo - Parth.png" alt="RentWise" height="62" />
+  <img src="/RentWise Logo - Parth.png" alt="RentWise" height="40" />
       </Link>
         <div className="nav-links">
           <Link to="/">Browse</Link>
           {user ? (
             <>
-              <Link to="/add">+ Add Listing</Link>
+              {user.role === 'landlord' && <Link to="/add">+ Add Listing</Link>}
+              {user.role === 'landlord' && <Link to="/my-listings">My Listings</Link>}
+              {user.role !== 'landlord' && <Link to="/dashboard">Dashboard</Link>}
+              {user.role !== 'landlord' && <Link to="/saved">Saved</Link>}
               <Link to="/profile">My Profile</Link>
               <button onClick={handleLogout} className="btn-link">Logout</button>
             </>

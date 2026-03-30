@@ -28,8 +28,9 @@ export default function Profile() {
     <div className="page">
       <h1>My Profile</h1>
       <div className="profile-info">
-        <h2>{profile.name}</h2>
+        <h2>{profile.first_name} {profile.last_name}</h2>
         <p className="text-muted">{profile.email}</p>
+        <p className="text-muted">Role: {profile.role === 'landlord' ? 'Landlord' : 'Renter'}</p>
         <p className="text-muted">Member since {new Date(profile.created_at).toLocaleDateString()}</p>
       </div>
 
@@ -42,13 +43,13 @@ export default function Profile() {
           {profile.reviews.map(r => (
             <div key={r.id} className="review-card">
               <div className="review-header">
-                <StarRating rating={r.rating} size="sm" />
+                <StarRating rating={r.rating_overall} size="sm" />
                 <Link to={`/apartments/${r.apartment_id}`} className="review-apt-link">
-                  {r.apartment_name} — {r.neighborhood}
+                  {r.apartment_name} — {r.city}, {r.state}
                 </Link>
               </div>
               <h4>{r.title}</h4>
-              <p>{r.body}</p>
+              <p>{r.review_text}</p>
               <span className="review-date">{new Date(r.created_at).toLocaleDateString()}</span>
             </div>
           ))}

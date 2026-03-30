@@ -64,27 +64,88 @@ function createTables() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`)
 
-    db.get('SELECT COUNT(*) as count FROM apartments', (err, row) => {
-      if (err || (row && row.count > 0)) return
+    db.run(`CREATE TABLE IF NOT EXISTS email_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`)
 
-      console.log('📦 Seeding sample data...')
+    db.run(`CREATE TABLE IF NOT EXISTS apartment_photos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      apartment_id INTEGER NOT NULL REFERENCES apartments(id) ON DELETE CASCADE,
+      photo_data TEXT NOT NULL,
+      display_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`)
 
-      db.run(`INSERT INTO users (first_name, last_name, email, password, is_verified) VALUES (?, ?, ?, ?, ?)`,
-        ['Demo', 'User', 'demo@rentwise.com', '$2b$10$PLACEHOLDER_NOT_FOR_LOGIN', 1])
+    db.run(`CREATE TABLE IF NOT EXISTS saved_apartments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      apartment_id INTEGER NOT NULL REFERENCES apartments(id) ON DELETE CASCADE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, apartment_id)
+    )`)
 
-      const apts = [
-        ['Sunny Heights', '412 Park Ave', 'New York', 'NY', '10001', 'Apartment', 1985],
-        ['The Greenway', '88 Elm Street', 'Brooklyn', 'NY', '11201', 'Apartment', 1992],
-        ['Riverside Lofts', '230 River Rd', 'Hoboken', 'NJ', '07030', 'Loft', 2005],
-        ['Maple Court', '15 Maple Dr', 'Stamford', 'CT', '06901', 'Townhouse', 1978],
-        ['Urban Nest', '501 5th Ave', 'New York', 'NY', '10017', 'Studio', 2010],
-      ]
-      apts.forEach(a => {
-        db.run('INSERT INTO apartments (name, street_address, city, state, zip_code, property_type, year_built) VALUES (?, ?, ?, ?, ?, ?, ?)', a)
+    db.run(`CREATE TABLE IF NOT EXISTS review_votes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      review_id INTEGER NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(review_id, user_id)
+    )`)
+
+    db.run(`CREATE TABLE IF NOT EXISTS review_replies (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      review_id INTEGER NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+      landlord_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reply_text TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(review_id)
+    )`)
+
+    db.run(`CREATE TABLE IF NOT EXISTS review_photos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      review_id INTEGER NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+      photo_data TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`)
+
+    db.run(`CREATE TABLE IF NOT EXISTS review_flags (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      review_id INTEGER NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reason TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(review_id, user_id)
+    )`)
+
+    db.run(`CREATE TABLE IF NOT EXISTS apartment_views (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      apartment_id INTEGER NOT NULL REFERENCES apartments(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`)
+
+  })
+}
+
+function runMigrations() {
+  db.all("PRAGMA table_info(users)", (err, cols) => {
+    if (err || !cols) return
+    if (!cols.find(c => c.name === 'role')) {
+      db.run("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'renter'", e => {
+        if (!e) console.log("✅ Migrated: users.role added")
       })
-
-      console.log('✅ Seeded 5 apartments and 1 demo user')
-    })
+    }
+  })
+  db.all("PRAGMA table_info(apartments)", (err, cols) => {
+    if (err || !cols) return
+    if (!cols.find(c => c.name === 'owner_id')) {
+      db.run("ALTER TABLE apartments ADD COLUMN owner_id INTEGER REFERENCES users(id)", e => {
+        if (!e) console.log("✅ Migrated: apartments.owner_id added")
+      })
+    }
   })
 }
 
@@ -92,6 +153,7 @@ function createTables() {
 db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='verifications'", (err, row) => {
   if (row) {
     createTables()
+    runMigrations()
     return
   }
 
@@ -107,6 +169,7 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='verification
     db.run('DROP TABLE IF EXISTS users')
     db.run('PRAGMA foreign_keys = ON', () => {
       createTables()
+      runMigrations()
       console.log('✅ Migration complete')
     })
   })

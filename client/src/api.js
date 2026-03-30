@@ -47,20 +47,47 @@ export const api = {
   },
   getApartment: (id) => request(`/apartments/${id}`),
   createApartment: (data) => request('/apartments', { method: 'POST', body: JSON.stringify(data) }),
+  updateApartment: (id, data) => request(`/apartments/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteApartment: (id) => request(`/apartments/${id}`, { method: 'DELETE' }),
+  getMyListings: () => request('/apartments/mine'),
+  getFilterOptions: () => request('/apartments/filters'),
+  uploadApartmentPhotos: (id, formData) => requestMultipart(`/apartments/${id}/photos`, formData),
+  deleteApartmentPhoto: (aptId, photoId) => request(`/apartments/${aptId}/photos/${photoId}`, { method: 'DELETE' }),
+  claimApartment: (id) => request(`/apartments/${id}/claim`, { method: 'POST' }),
 
   // Verifications
   createVerification: (formData) => requestMultipart('/verifications', formData),
   getMyVerification: (apartmentId) => request(`/verifications/my/${apartmentId}`),
+  getMyVerifications: () => request('/verifications/mine'),
 
   // Reviews
-  createReview: (aptId, data) => request(`/apartments/${aptId}/reviews`, { method: 'POST', body: JSON.stringify(data) }),
+  createReview: (aptId, formData) => requestMultipart(`/apartments/${aptId}/reviews`, formData),
   deleteReview: (aptId, reviewId) => request(`/apartments/${aptId}/reviews/${reviewId}`, { method: 'DELETE' }),
+
+  // Saved
+  getSaved: () => request('/saved'),
+  toggleSave: (aptId) => request(`/saved/${aptId}`, { method: 'POST' }),
+  getSaveStatus: (aptId) => request(`/saved/${aptId}/status`),
+
+  // Votes
+  toggleVote: (reviewId) => request(`/votes/reviews/${reviewId}`, { method: 'POST' }),
+
+  // Replies
+  replyToReview: (reviewId, reply_text) => request(`/replies/reviews/${reviewId}`, { method: 'POST', body: JSON.stringify({ reply_text }) }),
+  updateReply: (reviewId, reply_text) => request(`/replies/reviews/${reviewId}`, { method: 'PUT', body: JSON.stringify({ reply_text }) }),
+  deleteReply: (reviewId) => request(`/replies/reviews/${reviewId}`, { method: 'DELETE' }),
+
+  // Flags
+  flagReview: (reviewId, reason) => request(`/flags/reviews/${reviewId}`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  unflagReview: (reviewId) => request(`/flags/reviews/${reviewId}`, { method: 'DELETE' }),
 
   // Auth
   register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   login: (data) => request('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   getMe: () => request('/auth/me'),
+  verifyEmail: (token) => request(`/auth/verify/${token}`),
+  resendVerification: () => request('/auth/resend-verification', { method: 'POST' }),
 
   // Users
   getMyProfile: () => request('/users/me'),

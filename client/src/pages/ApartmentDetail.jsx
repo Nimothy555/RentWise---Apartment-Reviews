@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../context/AuthContext'
 import StarRating from '../components/StarRating'
@@ -10,10 +10,12 @@ const DOC_TYPE_OPTIONS = [
   { value: 'postal_mail', label: 'Postal Mail' },
 ]
 
+const PROPERTY_TYPES = ['Apartment', 'Loft', 'Townhouse', 'Studio', 'Condo', 'House']
+
 function VerificationStep({ apartment, onVerified }) {
   const [docType, setDocType] = useState('lease')
   const [file, setFile] = useState(null)
-  const [status, setStatus] = useState('idle') // idle | loading | failed | error
+  const [status, setStatus] = useState('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
   const handleSubmit = async (e) => {
@@ -89,6 +91,7 @@ function ReviewForm({ apartmentId, verificationId, onSubmit }) {
   const [form, setForm] = useState({
     rating_overall: 5, rating_safety: '', rating_management: '', title: '', review_text: ''
   })
+  const [photos, setPhotos] = useState([])
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -97,15 +100,17 @@ function ReviewForm({ apartmentId, verificationId, onSubmit }) {
     setError('')
     setSubmitting(true)
     try {
-      await api.createReview(apartmentId, {
-        verification_id: verificationId,
-        rating_overall: Number(form.rating_overall),
-        rating_safety: form.rating_safety !== '' ? Number(form.rating_safety) : undefined,
-        rating_management: form.rating_management !== '' ? Number(form.rating_management) : undefined,
-        title: form.title,
-        review_text: form.review_text,
-      })
+      const formData = new FormData()
+      formData.append('verification_id', verificationId)
+      formData.append('rating_overall', form.rating_overall)
+      if (form.rating_safety) formData.append('rating_safety', form.rating_safety)
+      if (form.rating_management) formData.append('rating_management', form.rating_management)
+      formData.append('title', form.title)
+      formData.append('review_text', form.review_text)
+      photos.forEach(f => formData.append('photos', f))
+      await api.createReview(apartmentId, formData)
       setForm({ rating_overall: 5, rating_safety: '', rating_management: '', title: '', review_text: '' })
+      setPhotos([])
       onSubmit()
     } catch (err) {
       setError(err.message)
@@ -159,6 +164,18 @@ function ReviewForm({ apartmentId, verificationId, onSubmit }) {
         </label>
       </div>
 
+      <div className="form-row">
+        <label>Photos (up to 3)
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="input"
+            onChange={e => setPhotos(Array.from(e.target.files).slice(0, 3))}
+          />
+        </label>
+      </div>
+
       <button type="submit" className="btn" disabled={submitting}>
         {submitting ? 'Submitting...' : 'Submit Review'}
       </button>
@@ -166,8 +183,14 @@ function ReviewForm({ apartmentId, verificationId, onSubmit }) {
   )
 }
 
-function ReviewCard({ review, apartmentId, currentUserId, onDelete }) {
-  const isOwner = currentUserId === review.user_id
+function ReviewCard({ review, apartmentId, currentUserId, isLandlordOwner, onDelete }) {
+  const [voteCount, setVoteCount] = useState(review.vote_count || 0)
+  const [voted, setVoted] = useState(!!review.user_voted)
+  const [replying, setReplying] = useState(false)
+  const [replyText, setReplyText] = useState(review.reply_text || '')
+  const [editingReply, setEditingReply] = useState(false)
+  const [showFlagMenu, setShowFlagMenu] = useState(false)
+  const [flagged, setFlagged] = useState(!!review.user_flagged)
 
   const handleDelete = async () => {
     if (!confirm('Delete this review?')) return
@@ -179,6 +202,44 @@ function ReviewCard({ review, apartmentId, currentUserId, onDelete }) {
     }
   }
 
+  const handleVote = async () => {
+    if (!currentUserId) return
+    try {
+      const data = await api.toggleVote(review.id)
+      setVoted(data.voted)
+      setVoteCount(data.count)
+    } catch {}
+  }
+
+  const handleReply = async () => {
+    try {
+      if (review.reply_text || editingReply) {
+        await api.updateReply(review.id, replyText)
+      } else {
+        await api.replyToReview(review.id, replyText)
+      }
+      setReplying(false)
+      setEditingReply(false)
+      window.location.reload()
+    } catch {}
+  }
+
+  const handleFlag = async (reason) => {
+    try {
+      if (flagged) {
+        await api.unflagReview(review.id)
+        setFlagged(false)
+      } else {
+        await api.flagReview(review.id, reason)
+        setFlagged(true)
+      }
+      setShowFlagMenu(false)
+    } catch {}
+  }
+
+  // Check if this review belongs to the current user (via verification lookup)
+  const isReviewOwner = currentUserId && review.user_voted !== undefined
+
   return (
     <div className="review-card">
       <div className="review-header">
@@ -189,27 +250,219 @@ function ReviewCard({ review, apartmentId, currentUserId, onDelete }) {
       </div>
       <h4>{review.title}</h4>
       <p>{review.review_text}</p>
+
+      {/* Review photos */}
+      {review.photos?.length > 0 && (
+        <div className="review-photos">
+          {review.photos.map(p => <img key={p.id} src={p.photo_data} alt="Review" className="review-photo" />)}
+        </div>
+      )}
+
+      {/* Sub-ratings */}
       {(review.rating_safety || review.rating_management) && (
-        <div className="sub-ratings-display">
+        <div className="sub-ratings">
           {review.rating_safety && <span>Safety: {review.rating_safety}/5</span>}
           {review.rating_management && <span>Management: {review.rating_management}/5</span>}
         </div>
       )}
-      {isOwner && (
-        <button onClick={handleDelete} className="btn-link danger">Delete my review</button>
+
+      {/* Landlord reply */}
+      {review.reply_text && !editingReply && (
+        <div className="landlord-reply">
+          <span className="reply-label">Landlord response</span>
+          <p>{review.reply_text}</p>
+          {isLandlordOwner && (
+            <button className="btn-link" onClick={() => { setReplyText(review.reply_text); setEditingReply(true) }}>Edit reply</button>
+          )}
+        </div>
       )}
+
+      {/* Reply form for landlord */}
+      {isLandlordOwner && (replying || editingReply) && (
+        <div className="reply-form">
+          <textarea className="input" rows={3} value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Write your response..." />
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn btn-sm" onClick={handleReply}>Post Reply</button>
+            <button className="btn btn-sm btn-outline" onClick={() => { setReplying(false); setEditingReply(false) }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Actions bar */}
+      <div className="review-actions">
+        <button
+          className={`vote-btn${voted ? ' voted' : ''}`}
+          onClick={handleVote}
+          disabled={!currentUserId}
+          title="Mark as helpful"
+        >
+          👍 {voteCount > 0 ? voteCount : ''} Helpful
+        </button>
+
+        {isLandlordOwner && !review.reply_text && !replying && (
+          <button className="btn-link" style={{ fontSize: '0.85rem' }} onClick={() => setReplying(true)}>Reply</button>
+        )}
+
+        {onDelete && (
+          <button onClick={handleDelete} className="btn-link btn-danger" style={{ fontSize: '0.85rem' }}>Delete my review</button>
+        )}
+
+        {currentUserId && (
+          <div style={{ marginLeft: 'auto', position: 'relative' }}>
+            <button
+              className={`flag-btn${flagged ? ' flagged' : ''}`}
+              onClick={() => flagged ? handleFlag(null) : setShowFlagMenu(v => !v)}
+              title="Report review"
+            >
+              ⚑
+            </button>
+            {showFlagMenu && !flagged && (
+              <div className="flag-menu">
+                {['spam', 'harassment', 'inaccurate', 'other'].map(r => (
+                  <button key={r} className="flag-menu-item" onClick={() => handleFlag(r)}>{r}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
+  )
+}
+
+function EditListingForm({ apartment, onSave, onCancel }) {
+  const [form, setForm] = useState({
+    name: apartment.name,
+    street_address: apartment.street_address,
+    city: apartment.city,
+    state: apartment.state,
+    zip_code: apartment.zip_code,
+    property_type: apartment.property_type || '',
+    year_built: apartment.year_built || '',
+  })
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [photoFiles, setPhotoFiles] = useState([])
+  const [uploadingPhotos, setUploadingPhotos] = useState(false)
+  const [photos, setPhotos] = useState(apartment.photos || [])
+
+  const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      await api.updateApartment(apartment.id, {
+        ...form,
+        year_built: form.year_built ? Number(form.year_built) : undefined,
+      })
+      if (photoFiles.length > 0) {
+        setUploadingPhotos(true)
+        const formData = new FormData()
+        photoFiles.forEach(f => formData.append('photos', f))
+        await api.uploadApartmentPhotos(apartment.id, formData)
+        setUploadingPhotos(false)
+      }
+      onSave()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeletePhoto = async (photoId) => {
+    try {
+      await api.deleteApartmentPhoto(apartment.id, photoId)
+      setPhotos(prev => prev.filter(p => p.id !== photoId))
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="review-form edit-listing-form">
+      <h3>Edit Listing</h3>
+      {error && <div className="error-msg">{error}</div>}
+      <label>Apartment Name
+        <input type="text" value={form.name} onChange={e => update('name', e.target.value)} className="input" required />
+      </label>
+      <label>Street Address
+        <input type="text" value={form.street_address} onChange={e => update('street_address', e.target.value)} className="input" required />
+      </label>
+      <div className="form-row-inline">
+        <label>City
+          <input type="text" value={form.city} onChange={e => update('city', e.target.value)} className="input" required />
+        </label>
+        <label>State
+          <input type="text" value={form.state} onChange={e => update('state', e.target.value)} className="input" required maxLength={2} />
+        </label>
+      </div>
+      <label>Zip Code
+        <input type="text" value={form.zip_code} onChange={e => update('zip_code', e.target.value)} className="input" required />
+      </label>
+      <div className="form-row-inline">
+        <label>Property Type
+          <select value={form.property_type} onChange={e => update('property_type', e.target.value)} className="input">
+            <option value="">— Optional —</option>
+            {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+        <label>Year Built
+          <input type="number" value={form.year_built} onChange={e => update('year_built', e.target.value)} className="input" min="1800" max="2100" />
+        </label>
+      </div>
+
+      {/* Current photos */}
+      {photos.length > 0 && (
+        <div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Current photos:</p>
+          <div className="photo-thumbs">
+            {photos.map(p => (
+              <div key={p.id} className="photo-thumb-wrap">
+                <img src={p.photo_data} alt="Listing" className="photo-thumb" />
+                <button type="button" className="photo-thumb-delete" onClick={() => handleDeletePhoto(p.id)}>×</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Upload new photos */}
+      {photos.length < 5 && (
+        <label>Add Photos (up to {5 - photos.length} more)
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="input"
+            onChange={e => setPhotoFiles(Array.from(e.target.files).slice(0, 5 - photos.length))}
+          />
+        </label>
+      )}
+
+      <div className="owner-actions">
+        <button type="submit" className="btn" disabled={saving || uploadingPhotos}>
+          {saving ? 'Saving...' : uploadingPhotos ? 'Uploading photos...' : 'Save Changes'}
+        </button>
+        <button type="button" className="btn-link" onClick={onCancel}>Cancel</button>
+      </div>
+    </form>
   )
 }
 
 export default function ApartmentDetail() {
   const { id } = useParams()
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [apartment, setApartment] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [verificationId, setVerificationId] = useState(null)
   const [checkingVerification, setCheckingVerification] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -222,7 +475,7 @@ export default function ApartmentDetail() {
   useEffect(() => { load() }, [id])
 
   useEffect(() => {
-    if (!user || !id) return
+    if (!user || !id || user.role === 'landlord') return
     setCheckingVerification(true)
     api.getMyVerification(id)
       .then(data => setVerificationId(data.verification?.id || null))
@@ -230,11 +483,34 @@ export default function ApartmentDetail() {
       .finally(() => setCheckingVerification(false))
   }, [user, id])
 
+  const handleDeleteListing = async () => {
+    if (!confirm('Permanently delete this listing and all its data? This cannot be undone.')) return
+    setDeleting(true)
+    try {
+      await api.deleteApartment(apartment.id)
+      navigate('/')
+    } catch (err) {
+      alert(err.message)
+      setDeleting(false)
+    }
+  }
+
+  const handleClaim = async () => {
+    try {
+      await api.claimApartment(apartment.id)
+      load()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   if (loading) return <div className="page"><div className="loading">Loading...</div></div>
   if (error) return <div className="page"><div className="error-msg">{error}</div></div>
   if (!apartment) return <div className="page"><div className="empty">Apartment not found</div></div>
 
   const hasReviewed = verificationId && apartment.reviews?.some(r => r.verification_id === verificationId)
+  const isOwner = user && apartment.owner_id === user.id
+  const isLandlord = user?.role === 'landlord'
 
   return (
     <div className="page">
@@ -250,13 +526,46 @@ export default function ApartmentDetail() {
               {apartment.year_built && <span>Built {apartment.year_built}</span>}
             </div>
           </div>
+          {isOwner && !editing && (
+            <div className="owner-actions">
+              <button className="btn btn-sm" onClick={() => setEditing(true)}>Edit Listing</button>
+              <button className="btn btn-sm btn-danger" onClick={handleDeleteListing} disabled={deleting}>
+                {deleting ? 'Deleting...' : 'Delete Listing'}
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Photo gallery */}
+        {apartment.photos?.length > 0 && (
+          <div className="photo-gallery">
+            {apartment.photos.map(p => (
+              <img key={p.id} src={p.photo_data} alt="Apartment photo" className="gallery-photo" />
+            ))}
+          </div>
+        )}
 
         <div className="detail-rating">
           <StarRating rating={apartment.avg_rating} size="lg" />
           <span>({apartment.review_count} review{apartment.review_count !== 1 ? 's' : ''})</span>
         </div>
+
+        {/* Claim listing button */}
+        {user?.role === 'landlord' && !apartment.owner_id && (
+          <div className="claim-listing">
+            <button className="btn btn-sm btn-outline" onClick={handleClaim}>Claim this listing</button>
+            <span className="text-muted">Are you the landlord of this property?</span>
+          </div>
+        )}
       </div>
+
+      {editing && (
+        <EditListingForm
+          apartment={apartment}
+          onSave={() => { setEditing(false); load() }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
 
       <div className="reviews-section">
         <h2>Reviews</h2>
@@ -265,15 +574,19 @@ export default function ApartmentDetail() {
           <p className="text-muted"><Link to="/login">Log in</Link> to write a review.</p>
         )}
 
-        {user && !checkingVerification && !verificationId && (
+        {isLandlord && (
+          <p className="text-muted landlord-notice">Landlords cannot submit tenant reviews.</p>
+        )}
+
+        {user && !isLandlord && !checkingVerification && !verificationId && (
           <VerificationStep apartment={apartment} onVerified={setVerificationId} />
         )}
 
-        {user && verificationId && !hasReviewed && (
+        {user && !isLandlord && verificationId && !hasReviewed && (
           <ReviewForm apartmentId={apartment.id} verificationId={verificationId} onSubmit={load} />
         )}
 
-        {hasReviewed && (
+        {!isLandlord && hasReviewed && (
           <p className="text-muted">You've already reviewed this apartment.</p>
         )}
 
@@ -281,15 +594,21 @@ export default function ApartmentDetail() {
           <p className="empty">No reviews yet. Be the first!</p>
         ) : (
           <div className="reviews-list">
-            {apartment.reviews.map(r => (
-              <ReviewCard
-                key={r.id}
-                review={r}
-                apartmentId={apartment.id}
-                currentUserId={user?.id}
-                onDelete={load}
-              />
-            ))}
+            {apartment.reviews.map(r => {
+              // Determine if the current user owns this review
+              // We check via the verificationId matching
+              const isReviewMine = verificationId && r.verification_id === verificationId
+              return (
+                <ReviewCard
+                  key={r.id}
+                  review={r}
+                  apartmentId={apartment.id}
+                  currentUserId={user?.id}
+                  isLandlordOwner={isOwner}
+                  onDelete={isReviewMine ? load : null}
+                />
+              )
+            })}
           </div>
         )}
       </div>
