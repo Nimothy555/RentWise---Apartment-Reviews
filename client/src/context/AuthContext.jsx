@@ -12,7 +12,14 @@ export function AuthProvider({ children }) {
     if (!token) { setLoading(false); return }
     api.getMe()
       .then(data => setUser(data.user))
-      .catch(() => { localStorage.removeItem('token'); setUser(null) })
+      .catch((err) => {
+        // Only clear the token if the server explicitly rejects it (401)
+        // Network errors (server down, no connection) should keep the token intact
+        if (err.status === 401) {
+          localStorage.removeItem('token')
+        }
+        setUser(null)
+      })
       .finally(() => setLoading(false))
   }, [])
 
