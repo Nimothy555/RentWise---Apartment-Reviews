@@ -1,0 +1,23 @@
+# Dependencies — reinstalled inside the image
+node_modules/
+server/node_modules/
+client/node_modules/
+
+# Build output (generated during Docker build)
+client/dist/
+
+# Database — should be mounted as a volume, not baked in
+server/*.db
+*.db
+
+# Environment — never bake secrets into an image
+.env
+server/.env
+**/.env
+
+# Dev + OS noise
+.DS_Store
+*.log
+npm-debug.log*
+.git/
+.gitignore
