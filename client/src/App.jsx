@@ -12,6 +12,7 @@ import MyListings from './pages/MyListings'
 import VerifyEmail from './pages/VerifyEmail'
 import Dashboard from './pages/Dashboard'
 import Saved from './pages/Saved'
+import EditListing from './pages/EditListing'
 
 export default function App() {
   const { user } = useAuth()
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/saved" element={<Saved />} />
+          <Route path="/apartments/:id/edit" element={<EditListing />} />
         </Routes>
       </main>
     </>

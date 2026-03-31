@@ -37,8 +37,8 @@ export default function MyListings() {
       ) : (
         <div className="apartments-grid">
           {listings.map(apt => (
-            <Link key={apt.id} to={`/apartments/${apt.id}`} className="apartment-card">
-              <div className="card-body">
+            <div key={apt.id} className="apartment-card listing-managed">
+              <Link to={`/apartments/${apt.id}`} className="card-body card-body-link">
                 <h3 className="card-title">{apt.name}</h3>
                 <p className="card-address">{apt.street_address}, {apt.city}, {apt.state}</p>
                 <div className="card-meta">
@@ -58,8 +58,16 @@ export default function MyListings() {
                     {apt.view_count} view{apt.view_count !== 1 ? 's' : ''}
                   </p>
                 )}
+              </Link>
+              <div className="listing-actions">
+                <Link to={`/apartments/${apt.id}/edit`} className="btn btn-sm">
+                  ✏️ Edit
+                </Link>
+                <Link to={`/apartments/${apt.id}`} className="btn btn-sm btn-outline">
+                  View
+                </Link>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}
