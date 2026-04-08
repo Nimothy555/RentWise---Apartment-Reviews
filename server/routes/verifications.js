@@ -5,12 +5,14 @@ const Anthropic = require('@anthropic-ai/sdk')
 const db = require('../db')
 const { requireAuth } = require('../middleware/auth')
 
+const ALLOWED_MIMETYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith('image/')) {
-      return cb(new Error('Only image files are allowed'))
+    if (!ALLOWED_MIMETYPES.includes(file.mimetype)) {
+      return cb(new Error('Only image files (JPEG, PNG, GIF, WebP) or PDFs are allowed'))
     }
     cb(null, true)
   }
@@ -82,16 +84,17 @@ router.post('/', requireAuth, upload.single('document'), async (req, res) => {
     let verificationStatus = 'failed'
 
     try {
+      const contentBlock = mediaType === 'application/pdf'
+        ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Image } }
+        : { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Image } }
+
       const response = await anthropic.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 256,
         messages: [{
           role: 'user',
           content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: mediaType, data: base64Image }
-            },
+            contentBlock,
             {
               type: 'text',
               text: `This is a ${DOC_TYPE_LABELS[doc_type]}. Extract the property or mailing address from this document. Return ONLY the address in the format: "street, city, state zip". If no clear address is found, return exactly: NOT_FOUND`
