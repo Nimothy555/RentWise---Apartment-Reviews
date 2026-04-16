@@ -59,7 +59,12 @@ function addressesMatch(extracted, apartment) {
 }
 
 // POST /verifications
-router.post('/', requireAuth, upload.single('document'), async (req, res) => {
+router.post('/', requireAuth, (req, res, next) => {
+  upload.single('document')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message })
+    next()
+  })
+}, async (req, res) => {
   const { apartment_id, doc_type } = req.body
 
   if (!apartment_id) return res.status(400).json({ error: 'apartment_id is required' })
@@ -129,7 +134,7 @@ router.post('/', requireAuth, upload.single('document'), async (req, res) => {
           verificationStatus = addressesMatch(extractedAddress, apartment) ? 'verified' : 'failed'
         }
       } catch (claudeErr) {
-        console.error('Claude API error:', claudeErr.message)
+        console.error(`Claude API error processing ${mediaType}:`, claudeErr.message)
       }
     }
 
