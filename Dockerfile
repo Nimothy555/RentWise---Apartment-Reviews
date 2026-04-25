@@ -17,6 +17,9 @@ RUN cd server && npm ci --omit=dev
 # Copy server source
 COPY server/ ./server/
 
+# Copy database schema
+COPY database.sql ./
+
 # Copy the built React app from Stage 1
 COPY --from=build-client /app/client/dist ./client/dist
 
