@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+
+function FitBounds({ markers }) {
+  const map = useMap()
+  useEffect(() => {
+    if (markers.length === 0) return
+    map.fitBounds(markers.map(m => [m.lat, m.lng]), { padding: [50, 50] })
+  }, [markers, map])
+  return null
+}
 import { Link } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -68,6 +77,7 @@ export default function ApartmentMap({ apartments }) {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <FitBounds markers={markers} />
         {markers.map(m => (
           <Marker key={m.id} position={[m.lat, m.lng]}>
             <Popup>

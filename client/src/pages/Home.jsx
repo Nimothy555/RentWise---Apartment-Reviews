@@ -157,26 +157,24 @@ export default function Home() {
           </div>
         </div>
 
-        {loading ? (
+        {viewMode === 'map' ? (
+          <ApartmentMap apartments={loading ? [] : apartments} />
+        ) : loading ? (
           <div className="loading">Loading apartments...</div>
         ) : apartments.length === 0 ? (
           <div className="empty">No apartments found. Try adjusting your filters.</div>
         ) : (
           <>
-            {viewMode === 'map' ? (
-              <ApartmentMap apartments={apartments} />
-            ) : (
-              <div className="apartment-grid">
-                {apartments.map(apt => (
-                  <ApartmentCard
-                    key={apt.id}
-                    apartment={apt}
-                    saved={savedIds.has(apt.id)}
-                    onToggleSave={user ? handleToggleSave : undefined}
-                  />
-                ))}
-              </div>
-            )}
+            <div className="apartment-grid">
+              {apartments.map(apt => (
+                <ApartmentCard
+                  key={apt.id}
+                  apartment={apt}
+                  saved={savedIds.has(apt.id)}
+                  onToggleSave={user ? handleToggleSave : undefined}
+                />
+              ))}
+            </div>
 
             {pagination && pagination.pages > 1 && (
               <div className="pagination">
