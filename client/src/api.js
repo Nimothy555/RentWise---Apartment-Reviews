@@ -89,6 +89,7 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   getMe: () => request('/auth/me'),
   verifyEmail: (token) => request(`/auth/verify/${token}`),
+  verifyOtp: (email, otp) => request('/auth/verify-otp', { method: 'POST', body: JSON.stringify({ email, otp }) }),
   resendVerification: () => request('/auth/resend-verification', { method: 'POST' }),
   resendVerificationByEmail: (email) => request('/auth/resend-verification-by-email', { method: 'POST', body: JSON.stringify({ email }) }),
   forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),

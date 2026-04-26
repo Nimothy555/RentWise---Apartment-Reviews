@@ -34,6 +34,14 @@ function runMigrations() {
       })
     }
   })
+  db.all("PRAGMA table_info(email_tokens)", (err, cols) => {
+    if (err || !cols) return
+    if (!cols.find(c => c.name === 'otp')) {
+      db.run("ALTER TABLE email_tokens ADD COLUMN otp TEXT", e => {
+        if (!e) console.log("✅ Migrated: email_tokens.otp added")
+      })
+    }
+  })
 }
 
 // Migrate from old schema if needed (check for old 'leases' or missing 'verifications' table)

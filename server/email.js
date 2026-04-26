@@ -8,7 +8,7 @@ const transporter = nodemailer.createTransport({
   },
 })
 
-async function sendVerificationEmail(to, token) {
+async function sendVerificationEmail(to, token, otp) {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
   const link = `${frontendUrl}/verify-email?token=${token}`
   await transporter.sendMail({
@@ -18,9 +18,14 @@ async function sendVerificationEmail(to, token) {
     html: `
       <div style="font-family:'DM Sans',sans-serif;max-width:480px;margin:auto;padding:32px;background:#FAFAF7;">
         <h2 style="font-family:'DM Serif Display',Georgia,serif;color:#2D5016;font-weight:400;">Welcome to RentWise!</h2>
-        <p>Please verify your email address to get started.</p>
-        <a href="${link}" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#2D5016;color:#fff;border-radius:8px;text-decoration:none;font-weight:500;">Verify Email</a>
-        <p style="color:#888780;font-size:0.85rem;">This link expires in 24 hours. If you didn't create a RentWise account, you can ignore this email.</p>
+        <p>Please verify your email address to get started. You can use either option below.</p>
+        <p><strong>Option 1 — Click the link:</strong></p>
+        <a href="${link}" style="display:inline-block;margin:8px 0 24px;padding:12px 24px;background:#2D5016;color:#fff;border-radius:8px;text-decoration:none;font-weight:500;">Verify Email</a>
+        ${otp ? `
+        <p><strong>Option 2 — Enter this code on the site:</strong></p>
+        <div style="font-size:2rem;font-weight:700;letter-spacing:0.4em;color:#2D5016;background:#EEF3E8;padding:16px 24px;border-radius:8px;display:inline-block;margin-bottom:24px;">${otp}</div>
+        ` : ''}
+        <p style="color:#888780;font-size:0.85rem;">This link and code expire in 24 hours. If you didn't create a RentWise account, you can ignore this email.</p>
       </div>
     `,
   })

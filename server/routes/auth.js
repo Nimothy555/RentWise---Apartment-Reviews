@@ -30,6 +30,7 @@ function recordAttempt(key) {
 }
 function clearAttempts(key) { loginAttempts.delete(key) }
 function isValidEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) }
+function generateOtp() { return Math.floor(100000 + Math.random() * 900000).toString() }
 
 function signToken(user) {
   return jwt.sign(
@@ -72,8 +73,9 @@ router.post('/register', async (req, res) => {
     // Send verification email (non-fatal)
     try {
       const verifyToken = crypto.randomBytes(32).toString('hex')
-      await db.runAsync('INSERT INTO email_tokens (user_id, token) VALUES (?, ?)', [result.lastID, verifyToken])
-      await sendVerificationEmail(email.toLowerCase().trim(), verifyToken)
+      const otp = generateOtp()
+      await db.runAsync('INSERT INTO email_tokens (user_id, token, otp) VALUES (?, ?, ?)', [result.lastID, verifyToken, otp])
+      await sendVerificationEmail(email.toLowerCase().trim(), verifyToken, otp)
     } catch (emailErr) {
       console.error('Failed to send verification email:', emailErr.message)
     }
@@ -179,6 +181,30 @@ router.get('/verify/:token', async (req, res) => {
   }
 })
 
+// POST /auth/verify-otp
+router.post('/verify-otp', async (req, res) => {
+  const { email, otp } = req.body
+  if (!email || !otp) return res.status(400).json({ error: 'Email and code required' })
+  try {
+    const user = await db.getAsync('SELECT id, is_verified FROM users WHERE email = ?', [email.toLowerCase().trim()])
+    if (!user || user.is_verified) return res.status(400).json({ error: 'Invalid code' })
+    const record = await db.getAsync('SELECT * FROM email_tokens WHERE user_id = ? AND otp = ?', [user.id, otp.trim()])
+    if (!record) return res.status(400).json({ error: 'Invalid or expired code' })
+    const age = Date.now() - new Date(record.created_at).getTime()
+    if (age > 24 * 60 * 60 * 1000) {
+      await db.runAsync('DELETE FROM email_tokens WHERE id = ?', [record.id])
+      return res.status(400).json({ error: 'Code has expired. Please request a new one.' })
+    }
+    await db.runAsync('UPDATE users SET is_verified = 1 WHERE id = ?', [user.id])
+    await db.runAsync('DELETE FROM email_tokens WHERE user_id = ?', [user.id])
+    const fullUser = await db.getAsync('SELECT * FROM users WHERE id = ?', [user.id])
+    const token = signToken(fullUser)
+    res.json({ message: 'Email verified successfully', token })
+  } catch (err) {
+    res.status(500).json({ error: 'Verification failed' })
+  }
+})
+
 // POST /auth/resend-verification (requires auth token)
 router.post('/resend-verification', requireAuth, async (req, res) => {
   try {
@@ -191,8 +217,9 @@ router.post('/resend-verification', requireAuth, async (req, res) => {
     }
     await db.runAsync('DELETE FROM email_tokens WHERE user_id = ?', [req.user.id])
     const token = crypto.randomBytes(32).toString('hex')
-    await db.runAsync('INSERT INTO email_tokens (user_id, token) VALUES (?, ?)', [req.user.id, token])
-    await sendVerificationEmail(user.email, token).catch(e => console.error('Email error:', e))
+    const otp = generateOtp()
+    await db.runAsync('INSERT INTO email_tokens (user_id, token, otp) VALUES (?, ?, ?)', [req.user.id, token, otp])
+    await sendVerificationEmail(user.email, token, otp).catch(e => console.error('Email error:', e))
     res.json({ message: 'Verification email sent' })
   } catch (err) {
     res.status(500).json({ error: 'Failed to resend verification email' })
@@ -214,8 +241,9 @@ router.post('/resend-verification-by-email', async (req, res) => {
     }
     await db.runAsync('DELETE FROM email_tokens WHERE user_id = ?', [user.id])
     const token = crypto.randomBytes(32).toString('hex')
-    await db.runAsync('INSERT INTO email_tokens (user_id, token) VALUES (?, ?)', [user.id, token])
-    await sendVerificationEmail(user.email, token).catch(e => console.error('Resend email error:', e))
+    const otp = generateOtp()
+    await db.runAsync('INSERT INTO email_tokens (user_id, token, otp) VALUES (?, ?, ?)', [user.id, token, otp])
+    await sendVerificationEmail(user.email, token, otp).catch(e => console.error('Resend email error:', e))
     res.json({ message: 'If that email exists and is unverified, a new link has been sent.' })
   } catch (err) {
     res.status(500).json({ error: 'Failed to resend verification email' })

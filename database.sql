@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS email_tokens (
   id          INTEGER  PRIMARY KEY AUTOINCREMENT,
   user_id     INTEGER  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token       TEXT     NOT NULL UNIQUE,
+  otp         TEXT,
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
