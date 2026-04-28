@@ -40,6 +40,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 a { color: var(--sage); text-decoration: none; }
@@ -461,7 +462,7 @@ select.input { cursor: pointer; min-width: 140px; width: auto; }
 .review-photos { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
 .review-photo { width: 120px; height: 90px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; }
 
-.sub-ratings {
+.sub-ratings-display {
   display: flex; gap: 1rem; margin-top: 0.5rem;
   font-size: 0.82rem; color: var(--muted);
 }
@@ -778,13 +779,10 @@ select.input { cursor: pointer; min-width: 140px; width: auto; }
   .auth-container { margin: 1rem auto 0; padding: 1.5rem; }
   .footer { padding: 1rem 1.25rem; }
   .my-listings-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
-}
 
-@media (max-width: 640px) {
   /* Navbar: hamburger */
   .navbar { padding: 0 16px; }
   .nav-hamburger { display: flex; }
-
   .nav-links {
     display: none;
     position: absolute;
@@ -812,7 +810,9 @@ select.input { cursor: pointer; min-width: 140px; width: auto; }
   .nav-links .btn-link:last-child { border-bottom: none; }
   .nav-links .btn { width: 100%; justify-content: center; margin-top: 0.25rem; }
   .nav-links .nav-login { border: none; padding: 0.6rem 0.25rem; }
+}
 
+@media (max-width: 640px) {
   /* Hero */
   .hero { padding: 2.5rem 1rem 2rem; }
   .hero h1 { font-size: 1.75rem; }
@@ -837,6 +837,9 @@ select.input { cursor: pointer; min-width: 140px; width: auto; }
 
   /* Sub-ratings grid */
   .sub-ratings { grid-template-columns: 1fr 1fr; }
+
+  /* View toggle alignment */
+  .view-toggle { align-self: flex-start; }
 
   /* Footer */
   .footer { flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 1rem 1.25rem; }

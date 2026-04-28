@@ -266,7 +266,7 @@ function ReviewCard({ review, apartmentId, currentUserId, isLandlordOwner, onDel
 
       {/* Sub-ratings */}
       {(review.rating_safety || review.rating_management) && (
-        <div className="sub-ratings">
+        <div className="sub-ratings-display">
           {review.rating_safety && <span>Safety: {review.rating_safety}/5</span>}
           {review.rating_management && <span>Management: {review.rating_management}/5</span>}
         </div>
