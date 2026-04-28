@@ -15,6 +15,7 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       RENTCAST_API_KEY: ${RENTCAST_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    privileged: true
     volumes:
       # Persist the SQLite database across container restarts
       - rentwise-db:/app/server
