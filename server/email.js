@@ -49,4 +49,37 @@ async function sendPasswordResetEmail(to, token) {
   })
 }
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail }
+async function sendVerificationSubmissionNotification({ user, apartment, docType, fileBuffer, fileMimetype, verificationStatus }) {
+  const docLabels = { lease: 'Lease Agreement', utility_bill: 'Utility Bill', postal_mail: 'Postal Mail' }
+  const statusLabel = verificationStatus === 'verified' ? '✅ Auto-verified' : verificationStatus === 'failed' ? '❌ Needs manual review' : '⏳ Pending'
+
+  const ext = fileMimetype === 'application/pdf' ? 'pdf'
+    : fileMimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ? 'docx'
+    : fileMimetype.split('/')[1] || 'file'
+
+  await transporter.sendMail({
+    from: `"RentWise" <${process.env.GMAIL_USER}>`,
+    to: process.env.VERIFICATION_INBOX || 'rentwise.verify@outlook.com',
+    subject: `[Verification] ${user.first_name} ${user.last_name} — ${apartment.name}`,
+    html: `
+      <div style="font-family:'DM Sans',sans-serif;max-width:560px;margin:auto;padding:32px;background:#FAFAF7;">
+        <h2 style="font-family:'DM Serif Display',Georgia,serif;color:#2D5016;font-weight:400;">New Verification Submission</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:0.95rem;">
+          <tr><td style="padding:8px 0;color:#555;width:140px;">Status</td><td style="padding:8px 0;font-weight:600;">${statusLabel}</td></tr>
+          <tr><td style="padding:8px 0;color:#555;">User</td><td style="padding:8px 0;">${user.first_name} ${user.last_name} &lt;${user.email}&gt;</td></tr>
+          <tr><td style="padding:8px 0;color:#555;">Document Type</td><td style="padding:8px 0;">${docLabels[docType] || docType}</td></tr>
+          <tr><td style="padding:8px 0;color:#555;">Apartment</td><td style="padding:8px 0;">${apartment.name}</td></tr>
+          <tr><td style="padding:8px 0;color:#555;">Address</td><td style="padding:8px 0;">${apartment.street_address}, ${apartment.city}, ${apartment.state} ${apartment.zip_code}</td></tr>
+        </table>
+        <p style="color:#888780;font-size:0.85rem;margin-top:24px;">The submitted document is attached. Review and update the verification status in the admin panel if needed.</p>
+      </div>
+    `,
+    attachments: [{
+      filename: `verification-${user.id}-${Date.now()}.${ext}`,
+      content: fileBuffer,
+      contentType: fileMimetype,
+    }]
+  })
+}
+
+module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendVerificationSubmissionNotification }

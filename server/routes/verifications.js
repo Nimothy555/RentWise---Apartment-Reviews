@@ -4,6 +4,7 @@ const multer = require('multer')
 const Anthropic = require('@anthropic-ai/sdk')
 const db = require('../db')
 const { requireAuth } = require('../middleware/auth')
+const { sendVerificationSubmissionNotification } = require('../email')
 
 const ALLOWED_MIMETYPES = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
@@ -151,6 +152,16 @@ router.post('/', requireAuth, (req, res, next) => {
     if (verificationStatus === 'verified') {
       await db.runAsync('UPDATE users SET is_verified = 1 WHERE id = ?', [req.user.id])
     }
+
+    // Notify the verification inbox
+    sendVerificationSubmissionNotification({
+      user: req.user,
+      apartment,
+      docType: doc_type,
+      fileBuffer: req.file.buffer,
+      fileMimetype: mediaType,
+      verificationStatus,
+    }).catch(e => console.error('Verification notification error:', e.message))
 
     res.status(201).json({
       id: result.lastID,
