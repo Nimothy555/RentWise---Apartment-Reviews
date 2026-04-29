@@ -9,14 +9,16 @@ PRAGMA foreign_keys = ON;
 -- ── Core entities ─────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS users (
-  id           INTEGER  PRIMARY KEY AUTOINCREMENT,
-  first_name   TEXT     NOT NULL,
-  last_name    TEXT     NOT NULL,
-  email        TEXT     UNIQUE NOT NULL,
-  password     TEXT     NOT NULL,
-  role         TEXT     NOT NULL DEFAULT 'renter',   -- 'renter' | 'landlord'
-  is_verified  INTEGER  DEFAULT 0,                   -- 0 = unverified, 1 = verified
-  created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+  id             INTEGER  PRIMARY KEY AUTOINCREMENT,
+  first_name     TEXT     NOT NULL,
+  last_name      TEXT     NOT NULL,
+  email          TEXT     UNIQUE NOT NULL,
+  password       TEXT     NOT NULL,
+  role           TEXT     NOT NULL DEFAULT 'renter',   -- 'renter' | 'landlord'
+  is_verified    INTEGER  DEFAULT 0,                   -- 0 = unverified, 1 = verified
+  phone          TEXT     UNIQUE,                      -- E.164 format, e.g. +12345678901
+  phone_verified INTEGER  DEFAULT 0,
+  created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS apartments (
@@ -85,6 +87,13 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id          INTEGER  PRIMARY KEY AUTOINCREMENT,
   user_id     INTEGER  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token       TEXT     NOT NULL UNIQUE,
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS phone_otps (
+  id          INTEGER  PRIMARY KEY AUTOINCREMENT,
+  phone       TEXT     NOT NULL,
+  otp         TEXT     NOT NULL,
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -7,6 +7,7 @@ export default function Register() {
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
@@ -18,7 +19,7 @@ export default function Register() {
     setError('')
     setLoading(true)
     try {
-      await register(firstName, lastName, email, password, 'renter')
+      await register(firstName, lastName, email, password, 'renter', phone || undefined)
       setDone(true)
     } catch (err) {
       setError(err.message)
@@ -73,6 +74,14 @@ export default function Register() {
             Password
             <input type="password" value={password} onChange={e => setPassword(e.target.value)}
               className="input" placeholder="At least 8 characters" required minLength={8} />
+          </label>
+          <label>
+            Phone Number <span style={{ color: '#888', fontWeight: 400 }}>(optional)</span>
+            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+              className="input" placeholder="+12125551234" />
+            <span style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.25rem', display: 'block' }}>
+              Add a phone number to enable phone login
+            </span>
           </label>
           <button type="submit" className="btn btn-full" disabled={loading}>
             {loading ? 'Creating account...' : 'Sign Up'}

@@ -42,6 +42,25 @@ function runMigrations() {
       })
     }
   })
+  db.all("PRAGMA table_info(users)", (err, cols) => {
+    if (err || !cols) return
+    if (!cols.find(c => c.name === 'phone')) {
+      db.run("ALTER TABLE users ADD COLUMN phone TEXT UNIQUE", e => {
+        if (!e) console.log("✅ Migrated: users.phone added")
+      })
+    }
+    if (!cols.find(c => c.name === 'phone_verified')) {
+      db.run("ALTER TABLE users ADD COLUMN phone_verified INTEGER DEFAULT 0", e => {
+        if (!e) console.log("✅ Migrated: users.phone_verified added")
+      })
+    }
+  })
+  db.run(`CREATE TABLE IF NOT EXISTS phone_otps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone TEXT NOT NULL,
+    otp TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`, e => { if (!e) console.log("✅ phone_otps table ready") })
 }
 
 // Migrate from old schema if needed (check for old 'leases' or missing 'verifications' table)

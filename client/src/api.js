@@ -94,6 +94,8 @@ export const api = {
   resendVerificationByEmail: (email) => request('/auth/resend-verification-by-email', { method: 'POST', body: JSON.stringify({ email }) }),
   forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (token, password) => request(`/auth/reset-password/${token}`, { method: 'POST', body: JSON.stringify({ password }) }),
+  sendPhoneOtp: (phone) => request('/auth/send-phone-otp', { method: 'POST', body: JSON.stringify({ phone }) }),
+  loginPhone: (phone, otp) => request('/auth/login-phone', { method: 'POST', body: JSON.stringify({ phone, otp }) }),
 
   // Users
   getMyProfile: () => request('/users/me'),
