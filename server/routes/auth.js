@@ -6,7 +6,6 @@ const crypto = require('crypto')
 const db = require('../db')
 const { requireAuth } = require('../middleware/auth')
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../email')
-const { sendOtpSms } = require('../sms')
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret'
 const JWT_EXPIRES = '7d'
@@ -31,7 +30,6 @@ function recordAttempt(key) {
 }
 function clearAttempts(key) { loginAttempts.delete(key) }
 function isValidEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) }
-function isValidPhone(phone) { return /^\+[1-9]\d{7,14}$/.test(phone) }
 function generateOtp() { return Math.floor(100000 + Math.random() * 900000).toString() }
 
 function signToken(user) {
@@ -44,7 +42,7 @@ function signToken(user) {
 
 // POST /auth/register
 router.post('/register', async (req, res) => {
-  const { first_name, last_name, email, password, phone } = req.body
+  const { first_name, last_name, email, password } = req.body
   const role = 'renter'
   const errors = []
   if (!first_name || typeof first_name !== 'string' || first_name.trim().length === 0) errors.push('First name is required')
@@ -55,7 +53,6 @@ router.post('/register', async (req, res) => {
   if (!password) errors.push('Password is required')
   if (password && password.length < 8) errors.push('Password must be at least 8 characters')
   if (password && password.length > 128) errors.push('Password must be under 128 characters')
-  if (phone && !isValidPhone(phone)) errors.push('Phone must be in E.164 format (e.g. +12125551234)')
   // Role is always 'renter' — landlord portal removed
   if (errors.length > 0) return res.status(400).json({ errors })
 
@@ -67,15 +64,10 @@ router.post('/register', async (req, res) => {
     const existing = await db.getAsync('SELECT id FROM users WHERE email = ?', [email.toLowerCase().trim()])
     if (existing) return res.status(409).json({ error: 'Email already in use' })
 
-    if (phone) {
-      const phoneExists = await db.getAsync('SELECT id FROM users WHERE phone = ?', [phone])
-      if (phoneExists) return res.status(409).json({ error: 'Phone number already in use' })
-    }
-
     const hashed = await bcrypt.hash(password, 10)
     const result = await db.runAsync(
-      'INSERT INTO users (first_name, last_name, email, password, role, phone) VALUES (?, ?, ?, ?, ?, ?)',
-      [first_name.trim(), last_name.trim(), email.toLowerCase().trim(), hashed, role, phone || null]
+      'INSERT INTO users (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, ?)',
+      [first_name.trim(), last_name.trim(), email.toLowerCase().trim(), hashed, role]
     )
 
     // Send verification email (non-fatal)
@@ -308,120 +300,6 @@ router.post('/reset-password/:token', async (req, res) => {
     res.json({ message: 'Password reset successfully. You can now log in.' })
   } catch (err) {
     res.status(500).json({ error: 'Failed to reset password' })
-  }
-})
-
-// POST /auth/add-phone (requires auth — lets existing users add/update their phone)
-router.post('/add-phone', requireAuth, async (req, res) => {
-  const { phone } = req.body
-  if (!phone || !isValidPhone(phone)) {
-    return res.status(400).json({ error: 'A valid phone number is required (e.g. +12125551234)' })
-  }
-  try {
-    const existing = await db.getAsync('SELECT id FROM users WHERE phone = ? AND id != ?', [phone, req.user.id])
-    if (existing) return res.status(409).json({ error: 'Phone number already in use' })
-
-    const recent = await db.getAsync('SELECT created_at FROM phone_otps WHERE phone = ?', [phone])
-    if (recent) {
-      const age = Date.now() - new Date(recent.created_at).getTime()
-      if (age < 60 * 1000) return res.status(429).json({ error: 'Please wait before requesting another code' })
-      await db.runAsync('DELETE FROM phone_otps WHERE phone = ?', [phone])
-    }
-
-    const otp = generateOtp()
-    await db.runAsync('INSERT INTO phone_otps (phone, otp) VALUES (?, ?)', [phone, otp])
-    await sendOtpSms(phone, otp)
-    await db.runAsync('UPDATE users SET phone = ?, phone_verified = 0 WHERE id = ?', [phone, req.user.id])
-    res.json({ message: 'Verification code sent to your phone' })
-  } catch (err) {
-    console.error('Add phone error:', err.message)
-    res.status(500).json({ error: 'Failed to send code' })
-  }
-})
-
-// POST /auth/verify-phone (requires auth — verifies OTP and marks phone as verified)
-router.post('/verify-phone', requireAuth, async (req, res) => {
-  const { otp } = req.body
-  if (!otp) return res.status(400).json({ error: 'Code required' })
-  try {
-    const user = await db.getAsync('SELECT phone FROM users WHERE id = ?', [req.user.id])
-    if (!user?.phone) return res.status(400).json({ error: 'No phone number on file' })
-
-    const record = await db.getAsync('SELECT * FROM phone_otps WHERE phone = ? AND otp = ?', [user.phone, otp.trim()])
-    if (!record) return res.status(400).json({ error: 'Invalid or expired code' })
-
-    const age = Date.now() - new Date(record.created_at).getTime()
-    if (age > 10 * 60 * 1000) {
-      await db.runAsync('DELETE FROM phone_otps WHERE phone = ?', [user.phone])
-      return res.status(400).json({ error: 'Code has expired. Please request a new one.' })
-    }
-
-    await db.runAsync('UPDATE users SET phone_verified = 1 WHERE id = ?', [req.user.id])
-    await db.runAsync('DELETE FROM phone_otps WHERE phone = ?', [user.phone])
-    res.json({ message: 'Phone number verified successfully' })
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to verify phone' })
-  }
-})
-
-// POST /auth/send-phone-otp
-router.post('/send-phone-otp', async (req, res) => {
-  const { phone } = req.body
-  if (!phone || !isValidPhone(phone)) {
-    return res.status(400).json({ error: 'A valid phone number is required (e.g. +12125551234)' })
-  }
-
-  const ip = req.ip || 'unknown'
-  if (!checkRateLimit(`phone-otp:${ip}`)) return res.status(429).json({ error: 'Too many attempts. Please wait.' })
-  recordAttempt(`phone-otp:${ip}`)
-
-  try {
-    const user = await db.getAsync('SELECT id FROM users WHERE phone = ?', [phone])
-    // Always respond success to avoid phone enumeration
-    if (!user) return res.json({ message: 'If that number is registered, a code has been sent.' })
-
-    const existing = await db.getAsync('SELECT created_at FROM phone_otps WHERE phone = ?', [phone])
-    if (existing) {
-      const age = Date.now() - new Date(existing.created_at).getTime()
-      if (age < 60 * 1000) return res.json({ message: 'If that number is registered, a code has been sent.' })
-      await db.runAsync('DELETE FROM phone_otps WHERE phone = ?', [phone])
-    }
-
-    const otp = generateOtp()
-    await db.runAsync('INSERT INTO phone_otps (phone, otp) VALUES (?, ?)', [phone, otp])
-    await sendOtpSms(phone, otp)
-    res.json({ message: 'If that number is registered, a code has been sent.' })
-  } catch (err) {
-    console.error('Phone OTP error:', err.message)
-    res.status(500).json({ error: 'Failed to send code' })
-  }
-})
-
-// POST /auth/login-phone
-router.post('/login-phone', async (req, res) => {
-  const { phone, otp } = req.body
-  if (!phone || !otp) return res.status(400).json({ error: 'Phone and code required' })
-
-  try {
-    const record = await db.getAsync('SELECT * FROM phone_otps WHERE phone = ? AND otp = ?', [phone, otp.trim()])
-    if (!record) return res.status(401).json({ error: 'Invalid or expired code' })
-
-    const age = Date.now() - new Date(record.created_at).getTime()
-    if (age > 10 * 60 * 1000) {
-      await db.runAsync('DELETE FROM phone_otps WHERE phone = ?', [phone])
-      return res.status(401).json({ error: 'Code has expired. Please request a new one.' })
-    }
-
-    const user = await db.getAsync('SELECT * FROM users WHERE phone = ?', [phone])
-    if (!user) return res.status(401).json({ error: 'Invalid or expired code' })
-
-    await db.runAsync('DELETE FROM phone_otps WHERE phone = ?', [phone])
-    clearAttempts(`phone-otp:${req.ip || 'unknown'}`)
-
-    const token = signToken(user)
-    res.json({ message: 'Logged in', token, user: { id: user.id, first_name: user.first_name, last_name: user.last_name, role: user.role, is_verified: user.is_verified } })
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to login' })
   }
 })
 
