@@ -96,6 +96,8 @@ export const api = {
   resetPassword: (token, password) => request(`/auth/reset-password/${token}`, { method: 'POST', body: JSON.stringify({ password }) }),
   sendPhoneOtp: (phone) => request('/auth/send-phone-otp', { method: 'POST', body: JSON.stringify({ phone }) }),
   loginPhone: (phone, otp) => request('/auth/login-phone', { method: 'POST', body: JSON.stringify({ phone, otp }) }),
+  addPhone: (phone) => request('/auth/add-phone', { method: 'POST', body: JSON.stringify({ phone }) }),
+  verifyPhone: (otp) => request('/auth/verify-phone', { method: 'POST', body: JSON.stringify({ otp }) }),
 
   // Users
   getMyProfile: () => request('/users/me'),

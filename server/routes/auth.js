@@ -311,6 +311,59 @@ router.post('/reset-password/:token', async (req, res) => {
   }
 })
 
+// POST /auth/add-phone (requires auth — lets existing users add/update their phone)
+router.post('/add-phone', requireAuth, async (req, res) => {
+  const { phone } = req.body
+  if (!phone || !isValidPhone(phone)) {
+    return res.status(400).json({ error: 'A valid phone number is required (e.g. +12125551234)' })
+  }
+  try {
+    const existing = await db.getAsync('SELECT id FROM users WHERE phone = ? AND id != ?', [phone, req.user.id])
+    if (existing) return res.status(409).json({ error: 'Phone number already in use' })
+
+    const recent = await db.getAsync('SELECT created_at FROM phone_otps WHERE phone = ?', [phone])
+    if (recent) {
+      const age = Date.now() - new Date(recent.created_at).getTime()
+      if (age < 60 * 1000) return res.status(429).json({ error: 'Please wait before requesting another code' })
+      await db.runAsync('DELETE FROM phone_otps WHERE phone = ?', [phone])
+    }
+
+    const otp = generateOtp()
+    await db.runAsync('INSERT INTO phone_otps (phone, otp) VALUES (?, ?)', [phone, otp])
+    await sendOtpSms(phone, otp)
+    await db.runAsync('UPDATE users SET phone = ?, phone_verified = 0 WHERE id = ?', [phone, req.user.id])
+    res.json({ message: 'Verification code sent to your phone' })
+  } catch (err) {
+    console.error('Add phone error:', err.message)
+    res.status(500).json({ error: 'Failed to send code' })
+  }
+})
+
+// POST /auth/verify-phone (requires auth — verifies OTP and marks phone as verified)
+router.post('/verify-phone', requireAuth, async (req, res) => {
+  const { otp } = req.body
+  if (!otp) return res.status(400).json({ error: 'Code required' })
+  try {
+    const user = await db.getAsync('SELECT phone FROM users WHERE id = ?', [req.user.id])
+    if (!user?.phone) return res.status(400).json({ error: 'No phone number on file' })
+
+    const record = await db.getAsync('SELECT * FROM phone_otps WHERE phone = ? AND otp = ?', [user.phone, otp.trim()])
+    if (!record) return res.status(400).json({ error: 'Invalid or expired code' })
+
+    const age = Date.now() - new Date(record.created_at).getTime()
+    if (age > 10 * 60 * 1000) {
+      await db.runAsync('DELETE FROM phone_otps WHERE phone = ?', [user.phone])
+      return res.status(400).json({ error: 'Code has expired. Please request a new one.' })
+    }
+
+    await db.runAsync('UPDATE users SET phone_verified = 1 WHERE id = ?', [req.user.id])
+    await db.runAsync('DELETE FROM phone_otps WHERE phone = ?', [user.phone])
+    res.json({ message: 'Phone number verified successfully' })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to verify phone' })
+  }
+})
+
 // POST /auth/send-phone-otp
 router.post('/send-phone-otp', async (req, res) => {
   const { phone } = req.body
