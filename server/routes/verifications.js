@@ -1,7 +1,6 @@
 const express = require('express')
 const router = express.Router()
 const multer = require('multer')
-const Anthropic = require('@anthropic-ai/sdk')
 const db = require('../db')
 const { requireAuth } = require('../middleware/auth')
 const { sendVerificationSubmissionNotification } = require('../email')
@@ -23,40 +22,10 @@ const upload = multer({
   }
 })
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
 const DOC_TYPE_LABELS = {
-  lease: 'lease agreement',
-  utility_bill: 'utility bill',
-}
-
-function normalizeAddress(str) {
-  return str.toLowerCase()
-    .replace(/\b(apt|unit|suite|ste|#|no\.?|apartment)\b[\s\d\w]*/gi, '') // strip unit/apt numbers
-    .replace(/[.,#\-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function extractStreetCore(str) {
-  // Extract just the street number + street name (first meaningful part)
-  const norm = normalizeAddress(str)
-  return norm.split(',')[0].trim()
-}
-
-function addressesMatch(extracted, apartment) {
-  const extCore = extractStreetCore(extracted)
-  const streetCore = extractStreetCore(apartment.street_address)
-  const cityNorm = normalizeAddress(apartment.city)
-  const zipNorm = apartment.zip_code?.trim()
-
-  // Match if extracted street core includes the apartment's street address
-  const streetMatch = extCore.includes(streetCore) || streetCore.includes(extCore)
-  // Bonus: also check city or zip match for confidence
-  const cityMatch = normalizeAddress(extracted).includes(cityNorm)
-  const zipMatch = zipNorm && extracted.includes(zipNorm)
-
-  return streetMatch || (cityMatch && zipMatch)
+  lease: 'Lease Agreement',
+  utility_bill: 'Utility Bill',
+  postal_mail: 'Postal Mail',
 }
 
 // POST /verifications
@@ -97,47 +66,9 @@ router.post('/', requireAuth, (req, res, next) => {
       })
     }
 
-    // Call Claude to extract address from the document
     const base64Image = req.file.buffer.toString('base64')
     const mediaType = req.file.mimetype
-
-    let extractedAddress = null
-    let verificationStatus = 'pending'
-
-    const isDocx = mediaType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-
-    if (!isDocx) {
-      try {
-        const contentBlock = mediaType === 'application/pdf'
-          ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Image } }
-          : { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Image } }
-
-        const response = await anthropic.messages.create({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 256,
-          messages: [{
-            role: 'user',
-            content: [
-              contentBlock,
-              {
-                type: 'text',
-                text: `This is a ${DOC_TYPE_LABELS[doc_type]}. Extract the property or mailing address labeled as "Street Address" or the primary residence address. Ignore unit/apartment numbers. Return ONLY the street address in the format: "street, city, state zip". If no clear address is found, return exactly: NOT_FOUND`
-              }
-            ]
-          }]
-        })
-
-        extractedAddress = response.content[0]?.text?.trim()
-
-        if (!extractedAddress || extractedAddress === 'NOT_FOUND') {
-          verificationStatus = 'failed'
-        } else {
-          verificationStatus = addressesMatch(extractedAddress, apartment) ? 'verified' : 'failed'
-        }
-      } catch (claudeErr) {
-        console.error(`Claude API error processing ${mediaType}:`, claudeErr.message)
-      }
-    }
+    const verificationStatus = 'pending'
 
     // Store document as base64 data URL
     const documentUrl = `data:${mediaType};base64,${base64Image}`
@@ -147,11 +78,6 @@ router.post('/', requireAuth, (req, res, next) => {
        VALUES (?, ?, ?, ?, ?)`,
       [req.user.id, aptId, doc_type, documentUrl, verificationStatus]
     )
-
-    // If verified, mark user as verified
-    if (verificationStatus === 'verified') {
-      await db.runAsync('UPDATE users SET is_verified = 1 WHERE id = ?', [req.user.id])
-    }
 
     // Notify the verification inbox
     sendVerificationSubmissionNotification({
