@@ -92,7 +92,6 @@ router.post('/', requireAuth, (req, res, next) => {
     res.status(201).json({
       id: result.lastID,
       verification_status: verificationStatus,
-      extracted_address: extractedAddress,
       apartment_address: `${apartment.street_address}, ${apartment.city}, ${apartment.state} ${apartment.zip_code}`
     })
   } catch (err) {
