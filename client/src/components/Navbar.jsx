@@ -39,6 +39,9 @@ export default function Navbar() {
               <Link to="/add" onClick={close}>Add Listing</Link>
               <Link to="/saved" onClick={close}>Saved</Link>
               <Link to="/profile" onClick={close}>My Profile</Link>
+              {user.role === 'admin' && (
+                <Link to="/admin" className="btn btn-sm" onClick={close}>Admin Panel</Link>
+              )}
               <button onClick={handleLogout} className="btn-link">Logout</button>
             </>
           ) : (

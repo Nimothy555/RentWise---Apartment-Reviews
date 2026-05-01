@@ -97,4 +97,8 @@ export const api = {
 
   // Users
   getMyProfile: () => request('/users/me'),
+
+  // Admin
+  getAdminVerifications: () => request('/admin/verifications'),
+  updateVerificationStatus: (id, status) => request(`/admin/verifications/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
 }

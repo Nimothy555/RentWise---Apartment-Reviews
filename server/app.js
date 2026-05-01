@@ -11,6 +11,7 @@ const savedRoutes = require('./routes/saved')
 const voteRoutes = require('./routes/votes')
 const replyRoutes = require('./routes/replies')
 const flagRoutes = require('./routes/flags')
+const adminRoutes = require('./routes/admin')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -32,6 +33,7 @@ app.use('/api/saved', savedRoutes)
 app.use('/api/votes', voteRoutes)
 app.use('/api/replies', replyRoutes)
 app.use('/api/flags', flagRoutes)
+app.use('/api/admin', adminRoutes)
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', env: isProd ? 'production' : 'development' }))
 

@@ -13,6 +13,7 @@ import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import Saved from './pages/Saved'
 import AddApartment from './pages/AddApartment'
+import AdminPanel from './pages/AdminPanel'
 
 export default function App() {
   const { user } = useAuth()
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/saved" element={<Saved />} />
           <Route path="/add" element={<AddApartment />} />
+          <Route path="/admin" element={<AdminPanel />} />
         </Routes>
       </main>
     </>

@@ -99,4 +99,25 @@ async function sendVerificationReceivedEmail({ user, apartment }) {
   })
 }
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendVerificationSubmissionNotification, sendVerificationReceivedEmail }
+async function sendVerificationDecisionEmail({ user, apartmentName, approved }) {
+  const subject = approved ? 'Your verification has been approved' : 'Your verification was not approved'
+  const body = approved
+    ? `<p>Great news! Your residency verification for <strong>${apartmentName}</strong> has been <strong style="color:#2D5016;">approved</strong>. You can now post a review.</p>`
+    : `<p>Unfortunately, we were unable to verify your residency for <strong>${apartmentName}</strong>. Please log in and resubmit with a different document (lease agreement, utility bill, or postal mail).</p><p>If you believe this is an error, please reply to this email.</p>`
+
+  await transporter.sendMail({
+    from: `"RentWise" <${process.env.GMAIL_USER}>`,
+    to: user.email,
+    subject,
+    html: `
+      <div style="font-family:'DM Sans',sans-serif;max-width:480px;margin:auto;padding:32px;background:#FAFAF7;">
+        <h2 style="font-family:'DM Serif Display',Georgia,serif;color:#2D5016;font-weight:400;">${subject}</h2>
+        <p>Hi ${user.first_name},</p>
+        ${body}
+        <p>Thanks,<br/>The RentWise Team</p>
+      </div>
+    `,
+  })
+}
+
+module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendVerificationSubmissionNotification, sendVerificationReceivedEmail, sendVerificationDecisionEmail }
