@@ -77,6 +77,11 @@ function runMigrations() {
         if (!e) console.log("✅ Migrated: reviews.rating_responsiveness added")
       })
     }
+    if (!cols.find(c => c.name === 'rating_parking')) {
+      db.run("ALTER TABLE reviews ADD COLUMN rating_parking INTEGER", e => {
+        if (!e) console.log("✅ Migrated: reviews.rating_parking added")
+      })
+    }
   })
   db.all("PRAGMA table_info(users)", (err, cols) => {
     if (err || !cols) return

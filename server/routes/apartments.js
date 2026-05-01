@@ -301,7 +301,7 @@ router.get('/:id/reviews', async (req, res) => {
 
 // POST /apartments/:id/reviews
 router.post('/:id/reviews', requireAuth, upload.array('photos', 3), async (req, res) => {
-  const { verification_id, rating_overall, rating_safety, rating_management, rating_noise, rating_value, rating_responsiveness, title, review_text, display_name } = req.body
+  const { verification_id, rating_overall, rating_safety, rating_management, rating_noise, rating_value, rating_responsiveness, rating_parking, title, review_text, display_name } = req.body
 
   const errors = []
   if (!verification_id) errors.push('verification_id is required')
@@ -317,6 +317,7 @@ router.post('/:id/reviews', requireAuth, upload.array('photos', 3), async (req, 
   const noiseVal = rating_noise != null ? clamp(rating_noise, 1, 5) : null
   const valueVal = rating_value != null ? clamp(rating_value, 1, 5) : null
   const responsivenessVal = rating_responsiveness != null ? clamp(rating_responsiveness, 1, 5) : null
+  const parkingVal = rating_parking != null ? clamp(rating_parking, 1, 5) : null
 
   if (errors.length > 0) return res.status(400).json({ errors })
 
@@ -344,9 +345,9 @@ router.post('/:id/reviews', requireAuth, upload.array('photos', 3), async (req, 
     const resolvedDisplayName = display_name?.trim() || `${req.user.first_name} ${req.user.last_name}`
 
     const result = await db.runAsync(`
-      INSERT INTO reviews (verification_id, rating_overall, rating_safety, rating_management, rating_noise, rating_value, rating_responsiveness, title, review_text, display_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [parseInt(verification_id), overallVal, safetyVal, managementVal, noiseVal, valueVal, responsivenessVal, title.trim(), review_text.trim(), resolvedDisplayName])
+      INSERT INTO reviews (verification_id, rating_overall, rating_safety, rating_management, rating_noise, rating_value, rating_responsiveness, rating_parking, title, review_text, display_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [parseInt(verification_id), overallVal, safetyVal, managementVal, noiseVal, valueVal, responsivenessVal, parkingVal, title.trim(), review_text.trim(), resolvedDisplayName])
 
     if (req.files?.length > 0) {
       for (const f of req.files) {

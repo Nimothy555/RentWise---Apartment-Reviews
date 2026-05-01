@@ -100,7 +100,7 @@ function VerificationStep({ apartment, onVerified }) {
 function ReviewForm({ apartmentId, verificationId, onSubmit }) {
   const { user } = useAuth()
   const [form, setForm] = useState({
-    rating_overall: 5, rating_safety: '', rating_management: '', rating_noise: '', rating_value: '', rating_responsiveness: '', title: '', review_text: '', display_name: ''
+    rating_overall: 5, rating_safety: '', rating_management: '', rating_noise: '', rating_value: '', rating_parking: '', rating_responsiveness: '', title: '', review_text: '', display_name: ''
   })
   const [photos, setPhotos] = useState([])
   const [error, setError] = useState('')
@@ -119,6 +119,7 @@ function ReviewForm({ apartmentId, verificationId, onSubmit }) {
       if (form.rating_noise) formData.append('rating_noise', form.rating_noise)
       if (form.rating_value) formData.append('rating_value', form.rating_value)
       if (form.rating_responsiveness) formData.append('rating_responsiveness', form.rating_responsiveness)
+      if (form.rating_parking) formData.append('rating_parking', form.rating_parking)
       formData.append('title', form.title)
       formData.append('review_text', form.review_text)
       formData.append('display_name', form.display_name || `${user.first_name} ${user.last_name}`)
@@ -198,8 +199,14 @@ function ReviewForm({ apartmentId, verificationId, onSubmit }) {
             {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
-        <label>Value for Money
+        <label>Rent vs. Quality
           <select value={form.rating_value} onChange={e => setForm({ ...form, rating_value: e.target.value })} className="input">
+            <option value="">—</option>
+            {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <label>Parking
+          <select value={form.rating_parking} onChange={e => setForm({ ...form, rating_parking: e.target.value })} className="input">
             <option value="">—</option>
             {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n}</option>)}
           </select>
@@ -312,7 +319,8 @@ function ReviewCard({ review, apartmentId, currentUserId, isLandlordOwner, onDel
           {review.rating_safety && <span>Safety: {review.rating_safety}/5</span>}
           {review.rating_management && <span>Management: {review.rating_management}/5</span>}
           {review.rating_noise && <span>Noise: {review.rating_noise}/5</span>}
-          {review.rating_value && <span>Value: {review.rating_value}/5</span>}
+          {review.rating_value && <span>Rent vs. Quality: {review.rating_value}/5</span>}
+          {review.rating_parking && <span>Parking: {review.rating_parking}/5</span>}
           {review.rating_responsiveness && <span>Responsiveness: {review.rating_responsiveness}/5</span>}
         </div>
       )}
