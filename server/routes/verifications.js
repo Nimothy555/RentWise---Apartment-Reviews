@@ -3,7 +3,7 @@ const router = express.Router()
 const multer = require('multer')
 const db = require('../db')
 const { requireAuth } = require('../middleware/auth')
-const { sendVerificationSubmissionNotification } = require('../email')
+const { sendVerificationSubmissionNotification, sendVerificationReceivedEmail } = require('../email')
 
 const ALLOWED_MIMETYPES = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
@@ -78,6 +78,10 @@ router.post('/', requireAuth, (req, res, next) => {
        VALUES (?, ?, ?, ?, ?)`,
       [req.user.id, aptId, doc_type, documentUrl, verificationStatus]
     )
+
+    // Notify the user
+    sendVerificationReceivedEmail({ user: req.user, apartment })
+      .catch(e => console.error('Verification received email error:', e.message))
 
     // Notify the verification inbox
     sendVerificationSubmissionNotification({
