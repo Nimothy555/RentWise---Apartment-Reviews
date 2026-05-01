@@ -37,34 +37,41 @@ export default function AdminPanel() {
 
   return (
     <div className="page-container">
-      <h1 className="page-title">Admin — Pending Verifications</h1>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <h1 className="page-title" style={{ marginBottom: '0.25rem' }}>Pending Verifications</h1>
+        <p className="text-muted" style={{ margin: 0 }}>
+          {verifications.length === 0 ? 'All caught up.' : `${verifications.length} submission${verifications.length !== 1 ? 's' : ''} awaiting review`}
+        </p>
+      </div>
 
       {actionError && <div className="error-msg" style={{ marginBottom: '1rem' }}>{actionError}</div>}
 
-      {verifications.length === 0 ? (
-        <p className="text-muted">No pending verifications.</p>
-      ) : (
+      {verifications.length === 0 ? null : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {verifications.map(v => (
-            <div key={v.id} className="card" style={{ padding: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div>
-                  <p style={{ fontWeight: 600, margin: 0 }}>{v.first_name} {v.last_name}</p>
-                  <p style={{ margin: '0.15rem 0', color: '#555', fontSize: '0.9rem' }}>{v.email}</p>
-                  <p style={{ margin: '0.15rem 0', fontSize: '0.9rem' }}>
-                    <strong>{v.apartment_name}</strong> — {v.street_address}, {v.city}, {v.state} {v.zip_code}
+            <div key={v.id} className="card" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <p style={{ fontWeight: 600, margin: 0, fontSize: '1rem' }}>{v.first_name} {v.last_name}</p>
+                  <p style={{ margin: 0, color: '#666', fontSize: '0.875rem' }}>{v.email}</p>
+                  <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                    <strong>{v.apartment_name}</strong>
                   </p>
-                  <p style={{ margin: '0.15rem 0', fontSize: '0.85rem', color: '#888' }}>
-                    {DOC_LABELS[v.doc_type] || v.doc_type} · Submitted {new Date(v.created_at).toLocaleDateString()}
+                  <p style={{ margin: 0, fontSize: '0.875rem', color: '#555' }}>
+                    {v.street_address}, {v.city}, {v.state} {v.zip_code}
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#999' }}>
+                    {DOC_LABELS[v.doc_type] || v.doc_type} &nbsp;&middot;&nbsp; Submitted {new Date(v.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </p>
                 </div>
+
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                   <button
                     className="btn btn-sm"
                     style={{ background: '#f0f0f0', color: '#333' }}
                     onClick={() => setPreview(preview?.id === v.id ? null : v)}
                   >
-                    {preview?.id === v.id ? 'Hide Doc' : 'View Doc'}
+                    {preview?.id === v.id ? 'Hide Document' : 'View Document'}
                   </button>
                   <button className="btn btn-sm" onClick={() => decide(v.id, 'verified')}>
                     Approve
@@ -80,7 +87,7 @@ export default function AdminPanel() {
               </div>
 
               {preview?.id === v.id && (
-                <div style={{ marginTop: '1rem' }}>
+                <div style={{ marginTop: '1.25rem', borderTop: '1px solid #eee', paddingTop: '1.25rem' }}>
                   {v.document_url.startsWith('data:image') ? (
                     <img
                       src={v.document_url}
