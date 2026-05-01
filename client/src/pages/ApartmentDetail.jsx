@@ -98,8 +98,9 @@ function VerificationStep({ apartment, onVerified }) {
 }
 
 function ReviewForm({ apartmentId, verificationId, onSubmit }) {
+  const { user } = useAuth()
   const [form, setForm] = useState({
-    rating_overall: 5, rating_safety: '', rating_management: '', title: '', review_text: ''
+    rating_overall: 5, rating_safety: '', rating_management: '', title: '', review_text: '', display_name: ''
   })
   const [photos, setPhotos] = useState([])
   const [error, setError] = useState('')
@@ -117,6 +118,7 @@ function ReviewForm({ apartmentId, verificationId, onSubmit }) {
       if (form.rating_management) formData.append('rating_management', form.rating_management)
       formData.append('title', form.title)
       formData.append('review_text', form.review_text)
+      formData.append('display_name', form.display_name || `${user.first_name} ${user.last_name}`)
       photos.forEach(f => formData.append('photos', f))
       await api.createReview(apartmentId, formData)
       setForm({ rating_overall: 5, rating_safety: '', rating_management: '', title: '', review_text: '' })
@@ -143,6 +145,21 @@ function ReviewForm({ apartmentId, verificationId, onSubmit }) {
             ))}
           </select>
         </label>
+      </div>
+
+      <div className="form-row">
+        <label>Display Name
+          <input
+            type="text"
+            value={form.display_name}
+            onChange={e => setForm({ ...form, display_name: e.target.value })}
+            className="input"
+            placeholder={`${user.first_name} ${user.last_name}`}
+          />
+        </label>
+        <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0.25rem 0 0' }}>
+          Leave blank to post under your real name, or enter a custom name to post anonymously.
+        </p>
       </div>
 
       <div className="form-row">
@@ -254,7 +271,7 @@ function ReviewCard({ review, apartmentId, currentUserId, isLandlordOwner, onDel
     <div className="review-card">
       <div className="review-header">
         <StarRating rating={review.rating_overall} size="sm" />
-        <span className="review-author">by {review.first_name} {review.last_name}</span>
+        <span className="review-author">by {review.display_name}</span>
         <span className="verified-badge small">✓ Verified</span>
         <span className="review-date">{new Date(review.created_at).toLocaleDateString()}</span>
       </div>

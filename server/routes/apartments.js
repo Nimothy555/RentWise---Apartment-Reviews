@@ -164,7 +164,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     // Enriched reviews query
     const userId = req.user?.id || 0
     const reviews = await db.allAsync(`
-      SELECT r.*, u.first_name, u.last_name,
+      SELECT r.*, u.first_name, u.last_name, COALESCE(r.display_name, u.first_name || ' ' || u.last_name) as display_name,
         COUNT(DISTINCT rv.id) as vote_count,
         MAX(CASE WHEN rv.user_id = ? THEN 1 ELSE 0 END) as user_voted,
         rp.reply_text, rp.created_at as reply_created_at, rp.landlord_id,
@@ -301,7 +301,7 @@ router.get('/:id/reviews', async (req, res) => {
 
 // POST /apartments/:id/reviews
 router.post('/:id/reviews', requireAuth, upload.array('photos', 3), async (req, res) => {
-  const { verification_id, rating_overall, rating_safety, rating_management, title, review_text } = req.body
+  const { verification_id, rating_overall, rating_safety, rating_management, title, review_text, display_name } = req.body
 
   const errors = []
   if (!verification_id) errors.push('verification_id is required')
@@ -338,10 +338,12 @@ router.post('/:id/reviews', requireAuth, upload.array('photos', 3), async (req, 
     )
     if (existingReview) return res.status(409).json({ error: 'You already reviewed this apartment' })
 
+    const resolvedDisplayName = display_name?.trim() || `${req.user.first_name} ${req.user.last_name}`
+
     const result = await db.runAsync(`
-      INSERT INTO reviews (verification_id, rating_overall, rating_safety, rating_management, title, review_text)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [parseInt(verification_id), overallVal, safetyVal, managementVal, title.trim(), review_text.trim()])
+      INSERT INTO reviews (verification_id, rating_overall, rating_safety, rating_management, title, review_text, display_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [parseInt(verification_id), overallVal, safetyVal, managementVal, title.trim(), review_text.trim(), resolvedDisplayName])
 
     if (req.files?.length > 0) {
       for (const f of req.files) {

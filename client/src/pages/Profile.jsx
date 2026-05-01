@@ -9,6 +9,8 @@ export default function Profile() {
   const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [displayName, setDisplayName] = useState('')
+  const [displayNameSaved, setDisplayNameSaved] = useState(false)
 
   useEffect(() => {
     if (!user) {
@@ -16,10 +18,21 @@ export default function Profile() {
       return
     }
     api.getMyProfile()
-      .then(data => setProfile(data))
+      .then(data => {
+        setProfile(data)
+        setDisplayName(data.default_display_name || '')
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [user])
+
+  const saveDisplayName = async () => {
+    try {
+      await api.updateDisplayName(displayName)
+      setDisplayNameSaved(true)
+      setTimeout(() => setDisplayNameSaved(false), 2500)
+    } catch {}
+  }
 
   if (loading) return <div className="page"><div className="loading">Loading...</div></div>
   if (!profile) return null
@@ -32,6 +45,25 @@ export default function Profile() {
         <p className="text-muted">{profile.email}</p>
         <p className="text-muted">Role: {profile.role === 'landlord' ? 'Landlord' : 'Renter'}</p>
         <p className="text-muted">Member since {new Date(profile.created_at).toLocaleDateString()}</p>
+      </div>
+
+      <div className="profile-info" style={{ marginTop: '1.5rem' }}>
+        <h3 style={{ marginBottom: '0.5rem' }}>Display Name</h3>
+        <p className="text-muted" style={{ fontSize: '0.875rem', marginBottom: '0.75rem' }}>
+          This name will appear on your reviews by default. Leave blank to use your real name.
+        </p>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            className="input"
+            style={{ maxWidth: '280px' }}
+            value={displayName}
+            onChange={e => setDisplayName(e.target.value)}
+            placeholder={`${profile.first_name} ${profile.last_name}`}
+          />
+          <button className="btn btn-sm" onClick={saveDisplayName}>Save</button>
+          {displayNameSaved && <span style={{ color: '#2D5016', fontSize: '0.875rem' }}>Saved</span>}
+        </div>
       </div>
 
       <h2>My Reviews ({profile.reviews.length})</h2>

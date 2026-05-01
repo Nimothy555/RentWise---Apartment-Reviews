@@ -55,6 +55,22 @@ function runMigrations() {
       })
     }
   })
+  db.all("PRAGMA table_info(reviews)", (err, cols) => {
+    if (err || !cols) return
+    if (!cols.find(c => c.name === 'display_name')) {
+      db.run("ALTER TABLE reviews ADD COLUMN display_name TEXT", e => {
+        if (!e) console.log("✅ Migrated: reviews.display_name added")
+      })
+    }
+  })
+  db.all("PRAGMA table_info(users)", (err, cols) => {
+    if (err || !cols) return
+    if (!cols.find(c => c.name === 'default_display_name')) {
+      db.run("ALTER TABLE users ADD COLUMN default_display_name TEXT", e => {
+        if (!e) console.log("✅ Migrated: users.default_display_name added")
+      })
+    }
+  })
   db.run(`CREATE TABLE IF NOT EXISTS phone_otps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     phone TEXT NOT NULL,

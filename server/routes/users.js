@@ -26,6 +26,20 @@ router.get('/me', requireAuth, async (req, res) => {
   }
 })
 
+// PATCH /users/me/display-name
+router.patch('/me/display-name', requireAuth, async (req, res) => {
+  const { default_display_name } = req.body
+  try {
+    await db.runAsync(
+      'UPDATE users SET default_display_name = ? WHERE id = ?',
+      [default_display_name?.trim() || null, req.user.id]
+    )
+    res.json({ default_display_name: default_display_name?.trim() || null })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update display name' })
+  }
+})
+
 // GET /users/:id
 router.get('/:id', async (req, res) => {
   try {

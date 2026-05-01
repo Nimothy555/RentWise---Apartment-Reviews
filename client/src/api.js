@@ -97,6 +97,7 @@ export const api = {
 
   // Users
   getMyProfile: () => request('/users/me'),
+  updateDisplayName: (default_display_name) => request('/users/me/display-name', { method: 'PATCH', body: JSON.stringify({ default_display_name }) }),
 
   // Admin
   getAdminVerifications: () => request('/admin/verifications'),
