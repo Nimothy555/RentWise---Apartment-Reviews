@@ -51,11 +51,12 @@ function VerificationStep({ apartment, onVerified }) {
         Upload a document showing your address at <strong>{apartment.street_address}, {apartment.city}</strong> to post a review.
       </p>
 
-      {status === 'pending' && (
+      {status === 'pending' ? (
         <div className="info-msg">
           Your document has been submitted and is under review by our moderation team. You'll be able to post a review once it's approved.
         </div>
-      )}
+      ) : (
+      <>
       {status === 'failed' && (
         <div className="error-msg">
           Address on document didn't match the apartment address. Please try a different document.
@@ -90,6 +91,8 @@ function VerificationStep({ apartment, onVerified }) {
           {status === 'loading' ? 'Verifying...' : 'Verify Residency'}
         </button>
       </form>
+      </>
+      )}
     </div>
   )
 }
