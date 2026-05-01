@@ -62,6 +62,21 @@ function runMigrations() {
         if (!e) console.log("✅ Migrated: reviews.display_name added")
       })
     }
+    if (!cols.find(c => c.name === 'rating_noise')) {
+      db.run("ALTER TABLE reviews ADD COLUMN rating_noise INTEGER", e => {
+        if (!e) console.log("✅ Migrated: reviews.rating_noise added")
+      })
+    }
+    if (!cols.find(c => c.name === 'rating_value')) {
+      db.run("ALTER TABLE reviews ADD COLUMN rating_value INTEGER", e => {
+        if (!e) console.log("✅ Migrated: reviews.rating_value added")
+      })
+    }
+    if (!cols.find(c => c.name === 'rating_responsiveness')) {
+      db.run("ALTER TABLE reviews ADD COLUMN rating_responsiveness INTEGER", e => {
+        if (!e) console.log("✅ Migrated: reviews.rating_responsiveness added")
+      })
+    }
   })
   db.all("PRAGMA table_info(users)", (err, cols) => {
     if (err || !cols) return
