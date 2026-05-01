@@ -4,6 +4,42 @@ const db = require('../db')
 const { requireAdmin } = require('../middleware/requireAdmin')
 const { sendVerificationDecisionEmail } = require('../email')
 
+// GET /admin/reviews/suspicious — reviews with low trust signals
+router.get('/reviews/suspicious', requireAdmin, async (req, res) => {
+  try {
+    const reviews = await db.allAsync(`
+      SELECT r.id, r.title, r.review_text, r.created_at, r.rating_overall,
+             COALESCE(r.display_name, u.first_name || ' ' || u.last_name) as display_name,
+             u.email, u.created_at as user_created_at,
+             a.name as apartment_name,
+             (CASE WHEN r.rating_safety IS NOT NULL THEN 1 ELSE 0 END +
+              CASE WHEN r.rating_management IS NOT NULL THEN 1 ELSE 0 END +
+              CASE WHEN r.rating_noise IS NOT NULL THEN 1 ELSE 0 END +
+              CASE WHEN r.rating_value IS NOT NULL THEN 1 ELSE 0 END +
+              CASE WHEN r.rating_responsiveness IS NOT NULL THEN 1 ELSE 0 END +
+              CASE WHEN r.rating_parking IS NOT NULL THEN 1 ELSE 0 END) as criteria_filled
+      FROM reviews r
+      JOIN verifications v ON v.id = r.verification_id
+      JOIN users u ON u.id = v.user_id
+      JOIN apartments a ON a.id = v.apartment_id
+      WHERE (
+        CASE WHEN r.rating_safety IS NOT NULL THEN 1 ELSE 0 END +
+        CASE WHEN r.rating_management IS NOT NULL THEN 1 ELSE 0 END +
+        CASE WHEN r.rating_noise IS NOT NULL THEN 1 ELSE 0 END +
+        CASE WHEN r.rating_value IS NOT NULL THEN 1 ELSE 0 END +
+        CASE WHEN r.rating_responsiveness IS NOT NULL THEN 1 ELSE 0 END +
+        CASE WHEN r.rating_parking IS NOT NULL THEN 1 ELSE 0 END
+      ) = 0
+      OR length(r.review_text) < 30
+      ORDER BY r.created_at DESC
+    `)
+    res.json({ reviews })
+  } catch (err) {
+    console.error('GET /admin/reviews/suspicious error:', err)
+    res.status(500).json({ error: 'Failed to fetch suspicious reviews' })
+  }
+})
+
 // GET /admin/verifications — all pending verifications
 router.get('/verifications', requireAdmin, async (req, res) => {
   try {

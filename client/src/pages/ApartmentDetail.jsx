@@ -301,8 +301,14 @@ function ReviewCard({ review, apartmentId, currentUserId, isLandlordOwner, onDel
         <StarRating rating={review.rating_overall} size="sm" />
         <span className="review-author">by {review.display_name}</span>
         <span className="verified-badge small">✓ Verified</span>
+        {review.criteria_filled >= 4 && (
+          <span className="verified-badge small" style={{ background: '#e8f4e8', color: '#2D5016' }}>✓ Detailed</span>
+        )}
         <span className="review-date">{new Date(review.created_at).toLocaleDateString()}</span>
       </div>
+      <p style={{ fontSize: '0.78rem', color: '#aaa', margin: '0 0 0.5rem' }}>
+        Member since {new Date(review.user_created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+      </p>
       <h4>{review.title}</h4>
       <p>{review.review_text}</p>
 

@@ -164,13 +164,20 @@ router.get('/:id', optionalAuth, async (req, res) => {
     // Enriched reviews query
     const userId = req.user?.id || 0
     const reviews = await db.allAsync(`
-      SELECT r.*, u.first_name, u.last_name, COALESCE(r.display_name, u.first_name || ' ' || u.last_name) as display_name,
+      SELECT r.*, u.first_name, u.last_name, u.created_at as user_created_at,
+        COALESCE(r.display_name, u.first_name || ' ' || u.last_name) as display_name,
         COUNT(DISTINCT rv.id) as vote_count,
         MAX(CASE WHEN rv.user_id = ? THEN 1 ELSE 0 END) as user_voted,
         rp.reply_text, rp.created_at as reply_created_at, rp.landlord_id,
         lu.first_name as landlord_first_name, lu.last_name as landlord_last_name,
         COUNT(DISTINCT rf.id) as flag_count,
-        MAX(CASE WHEN rf.user_id = ? THEN 1 ELSE 0 END) as user_flagged
+        MAX(CASE WHEN rf.user_id = ? THEN 1 ELSE 0 END) as user_flagged,
+        (CASE WHEN r.rating_safety IS NOT NULL THEN 1 ELSE 0 END +
+         CASE WHEN r.rating_management IS NOT NULL THEN 1 ELSE 0 END +
+         CASE WHEN r.rating_noise IS NOT NULL THEN 1 ELSE 0 END +
+         CASE WHEN r.rating_value IS NOT NULL THEN 1 ELSE 0 END +
+         CASE WHEN r.rating_responsiveness IS NOT NULL THEN 1 ELSE 0 END +
+         CASE WHEN r.rating_parking IS NOT NULL THEN 1 ELSE 0 END) as criteria_filled
       FROM reviews r
       JOIN verifications v ON v.id = r.verification_id
       JOIN users u ON u.id = v.user_id

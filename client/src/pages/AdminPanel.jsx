@@ -22,7 +22,9 @@ const DENIAL_REASONS = [
 export default function AdminPanel() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [tab, setTab] = useState('verifications')
   const [verifications, setVerifications] = useState([])
+  const [suspiciousReviews, setSuspiciousReviews] = useState([])
   const [loading, setLoading] = useState(true)
   const [preview, setPreview] = useState(null)
   const [actionError, setActionError] = useState(null)
@@ -32,9 +34,13 @@ export default function AdminPanel() {
   useEffect(() => {
     if (!user) return navigate('/login')
     if (user.role !== 'admin') return navigate('/')
-    api.getAdminVerifications()
-      .then(data => setVerifications(data.verifications))
-      .catch(err => setActionError(err.message))
+    Promise.all([
+      api.getAdminVerifications(),
+      api.getSuspiciousReviews(),
+    ]).then(([vData, rData]) => {
+      setVerifications(vData.verifications)
+      setSuspiciousReviews(rData.reviews)
+    }).catch(err => setActionError(err.message))
       .finally(() => setLoading(false))
   }, [user])
 
@@ -67,16 +73,52 @@ export default function AdminPanel() {
 
   return (
     <div className="page-container">
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h1 className="page-title" style={{ marginBottom: '0.25rem' }}>Pending Verifications</h1>
-        <p className="text-muted" style={{ margin: 0 }}>
-          {verifications.length === 0 ? 'All caught up.' : `${verifications.length} submission${verifications.length !== 1 ? 's' : ''} awaiting review`}
-        </p>
+      <h1 className="page-title" style={{ marginBottom: '1rem' }}>Admin Panel</h1>
+
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid #eee', paddingBottom: '0.75rem' }}>
+        <button
+          className="btn btn-sm"
+          style={{ background: tab === 'verifications' ? '#2D5016' : '#f0f0f0', color: tab === 'verifications' ? '#fff' : '#333' }}
+          onClick={() => setTab('verifications')}
+        >
+          Verifications {verifications.length > 0 && `(${verifications.length})`}
+        </button>
+        <button
+          className="btn btn-sm"
+          style={{ background: tab === 'suspicious' ? '#c0392b' : '#f0f0f0', color: tab === 'suspicious' ? '#fff' : '#333' }}
+          onClick={() => setTab('suspicious')}
+        >
+          Suspicious Reviews {suspiciousReviews.length > 0 && `(${suspiciousReviews.length})`}
+        </button>
       </div>
 
       {actionError && <div className="error-msg" style={{ marginBottom: '1rem' }}>{actionError}</div>}
 
-      {verifications.length === 0 ? null : (
+      {tab === 'suspicious' && (
+        suspiciousReviews.length === 0 ? (
+          <p className="text-muted">No suspicious reviews found.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {suspiciousReviews.map(r => (
+              <div key={r.id} className="card" style={{ padding: '1.5rem', borderLeft: '3px solid #c0392b' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <p style={{ fontWeight: 600, margin: 0 }}>{r.apartment_name}</p>
+                  <p style={{ margin: 0, color: '#666', fontSize: '0.875rem' }}>{r.email} · Member since {new Date(r.user_created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</p>
+                  <p style={{ margin: 0, fontSize: '0.875rem' }}>Posted as <em>{r.display_name}</em> · {new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#c0392b' }}>
+                    {r.criteria_filled === 0 ? 'No sub-ratings filled in' : `Only ${r.criteria_filled} sub-rating${r.criteria_filled !== 1 ? 's' : ''} filled`}
+                    {r.review_text.length < 30 ? ' · Review text is very short' : ''}
+                  </p>
+                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem', color: '#333' }}>"{r.title}" — {r.review_text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {tab === 'verifications' && verifications.length === 0 ? <p className="text-muted">All caught up.</p> : null}
+      {tab === 'verifications' && verifications.length === 0 ? null : tab === 'verifications' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {verifications.map(v => (
             <div key={v.id} className="card" style={{ padding: '1.5rem' }}>
@@ -172,7 +214,7 @@ export default function AdminPanel() {
             </div>
           ))}
         </div>
-      )}
+      ))}
     </div>
   )
 }

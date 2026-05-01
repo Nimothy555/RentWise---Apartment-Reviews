@@ -101,5 +101,6 @@ export const api = {
 
   // Admin
   getAdminVerifications: () => request('/admin/verifications'),
+  getSuspiciousReviews: () => request('/admin/reviews/suspicious'),
   updateVerificationStatus: (id, status, denialReason) => request(`/admin/verifications/${id}`, { method: 'PATCH', body: JSON.stringify({ status, denial_reason: denialReason }) }),
 }
