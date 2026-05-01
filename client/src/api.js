@@ -100,5 +100,5 @@ export const api = {
 
   // Admin
   getAdminVerifications: () => request('/admin/verifications'),
-  updateVerificationStatus: (id, status) => request(`/admin/verifications/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  updateVerificationStatus: (id, status, denialReason) => request(`/admin/verifications/${id}`, { method: 'PATCH', body: JSON.stringify({ status, denial_reason: denialReason }) }),
 }

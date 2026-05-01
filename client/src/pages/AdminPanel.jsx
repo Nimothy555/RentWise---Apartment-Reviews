@@ -5,6 +5,20 @@ import { api } from '../api'
 
 const DOC_LABELS = { lease: 'Lease Agreement', utility_bill: 'Utility Bill', postal_mail: 'Postal Mail' }
 
+const DENIAL_REASONS = [
+  'Document is unreadable or too blurry to verify',
+  'Document appears to be expired',
+  'Document type does not match the selection made',
+  'Required information is missing or cut off',
+  'Address on document does not match the submitted apartment',
+  'Document shows a different unit number',
+  'Name on document does not match the account name',
+  'Document belongs to a different person',
+  'Document appears to have been altered or edited',
+  'Document is not an accepted form of proof',
+  'A verification for this apartment is already under review',
+]
+
 export default function AdminPanel() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -12,6 +26,8 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true)
   const [preview, setPreview] = useState(null)
   const [actionError, setActionError] = useState(null)
+  const [denyingId, setDenyingId] = useState(null)
+  const [denialReason, setDenialReason] = useState('')
 
   useEffect(() => {
     if (!user) return navigate('/login')
@@ -22,12 +38,26 @@ export default function AdminPanel() {
       .finally(() => setLoading(false))
   }, [user])
 
-  async function decide(id, status) {
+  async function approve(id) {
     setActionError(null)
     try {
-      await api.updateVerificationStatus(id, status)
+      await api.updateVerificationStatus(id, 'verified')
       setVerifications(prev => prev.filter(v => v.id !== id))
       if (preview?.id === id) setPreview(null)
+    } catch (err) {
+      setActionError(err.message)
+    }
+  }
+
+  async function confirmDeny(id) {
+    if (!denialReason) return
+    setActionError(null)
+    try {
+      await api.updateVerificationStatus(id, 'failed', denialReason)
+      setVerifications(prev => prev.filter(v => v.id !== id))
+      if (preview?.id === id) setPreview(null)
+      setDenyingId(null)
+      setDenialReason('')
     } catch (err) {
       setActionError(err.message)
     }
@@ -73,20 +103,54 @@ export default function AdminPanel() {
                   >
                     {preview?.id === v.id ? 'Hide Document' : 'View Document'}
                   </button>
-                  <button className="btn btn-sm" onClick={() => decide(v.id, 'verified')}>
+                  <button className="btn btn-sm" onClick={() => approve(v.id)}>
                     Approve
                   </button>
                   <button
                     className="btn btn-sm"
                     style={{ background: '#c0392b', color: '#fff' }}
-                    onClick={() => decide(v.id, 'failed')}
+                    onClick={() => { setDenyingId(v.id); setDenialReason('') }}
                   >
                     Deny
                   </button>
                 </div>
               </div>
 
-              {preview?.id === v.id && (
+              {denyingId === v.id && (
+                <div style={{ marginTop: '1.25rem', borderTop: '1px solid #eee', paddingTop: '1.25rem' }}>
+                  <p style={{ margin: '0 0 0.5rem', fontWeight: 500, fontSize: '0.9rem' }}>Select a reason for denial</p>
+                  <select
+                    className="input"
+                    value={denialReason}
+                    onChange={e => setDenialReason(e.target.value)}
+                    style={{ marginBottom: '0.75rem' }}
+                  >
+                    <option value="">Choose a reason...</option>
+                    {DENIAL_REASONS.map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      className="btn btn-sm"
+                      style={{ background: '#c0392b', color: '#fff' }}
+                      disabled={!denialReason}
+                      onClick={() => confirmDeny(v.id)}
+                    >
+                      Confirm Denial
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      style={{ background: '#f0f0f0', color: '#333' }}
+                      onClick={() => { setDenyingId(null); setDenialReason('') }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {preview?.id === v.id && denyingId !== v.id && (
                 <div style={{ marginTop: '1.25rem', borderTop: '1px solid #eee', paddingTop: '1.25rem' }}>
                   {v.document_url.startsWith('data:image') ? (
                     <img

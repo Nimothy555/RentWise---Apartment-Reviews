@@ -27,9 +27,12 @@ router.get('/verifications', requireAdmin, async (req, res) => {
 
 // PATCH /admin/verifications/:id — approve or deny
 router.patch('/verifications/:id', requireAdmin, async (req, res) => {
-  const { status } = req.body
+  const { status, denial_reason } = req.body
   if (!['verified', 'failed'].includes(status)) {
     return res.status(400).json({ error: 'status must be verified or failed' })
+  }
+  if (status === 'failed' && !denial_reason) {
+    return res.status(400).json({ error: 'A denial reason is required' })
   }
 
   const verificationId = parseInt(req.params.id)
@@ -57,6 +60,7 @@ router.patch('/verifications/:id', requireAdmin, async (req, res) => {
       user: { first_name: verification.first_name, last_name: verification.last_name, email: verification.email },
       apartmentName: verification.apartment_name,
       approved: status === 'verified',
+      denialReason: denial_reason,
     }).catch(e => console.error('Decision email error:', e.message))
 
     res.json({ id: verificationId, verification_status: status })
