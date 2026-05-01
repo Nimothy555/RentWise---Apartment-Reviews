@@ -91,7 +91,8 @@ async function sendVerificationReceivedEmail({ user, apartment }) {
       <div style="font-family:'DM Sans',sans-serif;max-width:480px;margin:auto;padding:32px;background:#FAFAF7;">
         <h2 style="font-family:'DM Serif Display',Georgia,serif;color:#2D5016;font-weight:400;">Submission Received</h2>
         <p>Hi ${user.first_name},</p>
-        <p>We received your verification document for <strong>${apartment.name}</strong> and it's currently under review. Our team will follow up once it's been processed.</p>
+        <p>We received your verification document for <strong>${apartment.name}</strong> and it's currently under review.</p>
+        <p>Please allow at least <strong>12 hours</strong> for our team to approve or deny your submission. We'll send you another email once a decision has been made.</p>
         <p>Thanks for your patience,<br/>The RentWise Team</p>
       </div>
     `,
