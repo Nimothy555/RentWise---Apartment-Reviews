@@ -11,6 +11,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true)
   const [displayName, setDisplayName] = useState('')
   const [displayNameSaved, setDisplayNameSaved] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (!user) {
@@ -22,7 +23,7 @@ export default function Profile() {
         setProfile(data)
         setDisplayName(data.default_display_name || '')
       })
-      .catch(() => {})
+      .catch(err => setError(err.message || 'Failed to load profile'))
       .finally(() => setLoading(false))
   }, [user])
 
@@ -35,6 +36,7 @@ export default function Profile() {
   }
 
   if (loading) return <div className="page"><div className="loading">Loading...</div></div>
+  if (error) return <div className="page"><div className="error-msg">{error}</div></div>
   if (!profile) return null
 
   return (
