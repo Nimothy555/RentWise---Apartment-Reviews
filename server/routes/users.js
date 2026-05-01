@@ -7,7 +7,7 @@ const { requireAuth } = require('../middleware/auth')
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const user = await db.getAsync(
-      'SELECT id, first_name, last_name, email, role, is_verified, phone, phone_verified, created_at FROM users WHERE id = ?',
+      'SELECT id, first_name, last_name, email, role, is_verified, phone, phone_verified, default_display_name, created_at FROM users WHERE id = ?',
       [req.user.id]
     )
     const reviews = await db.allAsync(`
